@@ -19,7 +19,6 @@ dependencies = [
     "ultralytics",
     "roboflow==1.1.33",
     "supervision",
-    "super-gradients"
+    "super-gradients==3.2.0"
 ]
-requires-python = ">= 3.8"
 description = "Tools to help with object detection tasks and support different models, such as YOLOv8, YOLO-NAS, Roboflow..."
