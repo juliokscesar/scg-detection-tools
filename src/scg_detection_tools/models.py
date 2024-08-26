@@ -8,8 +8,13 @@ from ultralytics import YOLO
 from super_gradients.training import models
 from roboflow import Roboflow
 import supervision as sv
+from pathlib import Path
+
+from utils.file_handling import generete_temp_path, clear_temp_folder
 
 SUPPORTED_MODEL_TYPES = ["yolov8", "yolonas", "roboflow"]
+
+FnEmbedSliceCallback: type = Callable[[str, np.ndarray, str, np.ndarray]]
 
 class BaseDetectionModel(ABC):
     def __init__(self, model_type: str, underlying_model):
@@ -34,8 +39,7 @@ class BaseDetectionModel(ABC):
                       slice_overlap_ratio: tuple,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         def sv_slice_callback(image: np.ndarray) -> sv.Detections:
-            # TODO: temp path in utils
-            tmpfile = "TODO"
+            tmpfile = generete_temp_path(suffix=Path(img_path).suffix)
             with open(tmpfile, "wb") as f:
                 sliceimg = image.copy()
                 cv2.imwrite(f.name, cv2.cvtColor(sliceimg, cv2.COLOR_RGB2BGR))
@@ -57,7 +61,6 @@ class BaseDetectionModel(ABC):
                                     overlap_ratio_wh=slice_overlap_ratio)
         sliced_detections = slicer(image=img)
 
-        #TODO clear temp folder
         return sliced_detections
 
 
