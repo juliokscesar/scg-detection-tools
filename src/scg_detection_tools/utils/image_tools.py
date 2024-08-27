@@ -4,7 +4,7 @@ import cv2
 import matplotlib.pyplot as plt
 from typing import Union
 
-from utils.file_handling import get_all_files_from_paths
+from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 
 def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thickness: int = 1) -> np.ndarray:
     box_annotator = sv.BoxAnnotator(thickness=box_thickness)

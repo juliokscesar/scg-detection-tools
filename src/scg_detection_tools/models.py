@@ -39,9 +39,19 @@ class BaseDetectionModel(ABC):
                       slice_overlap_ratio: tuple,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         def sv_slice_callback(image: np.ndarray) -> sv.Detections:
+            # Check if slice is smaller than the desired (640x640)
+            # if so, then fills to the right and to bottom with black pixels
+            # to get (640x640), but without changing the original pixels coordinates
+            sliceimg = image.copy()
+            h, w = sliceimg.shape[:2]
+            sh, sw = slice_wh
+            bot_fill = sh - h
+            right_fill = sw - w
+            if bot_fill or right_fill:
+                sliceimg = cv2.copyMakeBorder(sliceimg, 0, bot_fill, 0, right_fill, cv2.BORDER_CONSTANT, None, np.zeros(3))
+
             tmpfile = generete_temp_path(suffix=Path(img_path).suffix)
             with open(tmpfile, "wb") as f:
-                sliceimg = image.copy()
                 cv2.imwrite(f.name, cv2.cvtColor(sliceimg, cv2.COLOR_RGB2BGR))
 
                 det = self.predict(img_path=f.name,
