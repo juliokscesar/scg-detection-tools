@@ -2,3 +2,5 @@
 .temp/
 __pycache__/
 **.egg-info/
+*.pt
+*.pth

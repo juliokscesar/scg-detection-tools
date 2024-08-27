@@ -1,6 +1,7 @@
 import supervision as sv
+from typing import Union
 
-from models import BaseDetectionModel, FnEmbedSliceCallback
+from scg_detection_tools.models import BaseDetectionModel, FnEmbedSliceCallback
 
 DEFAULT_DETECTION_PARAMS = {
         "confidence": 50.0,
@@ -18,7 +19,7 @@ class Detector:
         self._det_params = detection_params
 
     def __call__(self, img):
-        self.detect_objects(img)
+        return self.detect_objects(img)
 
     # Returns a list of detections for every image (even for a single image)
     def detect_objects(self, img: Union[list, str], **diff_det_params) -> list:

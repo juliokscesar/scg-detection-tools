@@ -5,7 +5,7 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 import supervision as sv
 
-from detect import BaseDetectionModel, Detector
+from scg_detection_tools.detect import BaseDetectionModel, Detector
 
 class SAM2Segment:
     def __init__(self, 

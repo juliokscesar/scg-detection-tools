@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Callable
 
 import numpy as np
@@ -10,11 +10,11 @@ from roboflow import Roboflow
 import supervision as sv
 from pathlib import Path
 
-from utils.file_handling import generete_temp_path, clear_temp_folder
+from scg_detection_tools.utils.file_handling import generete_temp_path, clear_temp_folder
 
 SUPPORTED_MODEL_TYPES = ["yolov8", "yolonas", "roboflow"]
 
-FnEmbedSliceCallback: type = Callable[[str, np.ndarray, str, np.ndarray]]
+FnEmbedSliceCallback: type = Callable[[str, np.ndarray, str, np.ndarray], None]
 
 class BaseDetectionModel(ABC):
     def __init__(self, model_type: str, underlying_model):
