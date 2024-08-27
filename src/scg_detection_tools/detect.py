@@ -29,7 +29,7 @@ class Detector:
             self._det_params[param] = diff_det_params[param]
 
         if isinstance(img, str):
-            return self._detect_single_image(img)
+            return [self._detect_single_image(img)]
         elif isinstance(img, list):
             return self._detect_multiple_images(img)
         else:

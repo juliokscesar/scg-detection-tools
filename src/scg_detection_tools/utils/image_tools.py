@@ -16,7 +16,8 @@ def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thi
 
 def segment_annotated_image(default_imgpath: str, masks: np.ndarray) -> np.ndarray:
     img = cv2.imread(default_imgpath)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+    masked_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+    masked_img[:,:,3] = 1.0
 
     mask_color = np.array([30/255, 144/255, 255/255, 1.0])
     for mask in masks:
@@ -26,10 +27,12 @@ def segment_annotated_image(default_imgpath: str, masks: np.ndarray) -> np.ndarr
 
         alpha_mask = mask_img[:,:,3]
         alpha_dest = 1.0 - alpha_mask
+
         for c in range(3):
-            img[:,:,3] = (alpha_mask * mask_img[:,:,c] + alpha_dest * img[:,:,c])
+            masked_img[:,:,c] = (alpha_mask * mask_img[:,:,c] + alpha_dest * masked_img[:,:,c])
     
-    return img
+
+    return masked_img
 
 def plot_image(img: np.ndarray, cvt_to_rgb=True):
     if img.ndim == 2:

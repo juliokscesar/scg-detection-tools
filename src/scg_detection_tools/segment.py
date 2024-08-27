@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 import torch
 import sam2
 from sam2.build_sam import build_sam2
@@ -28,6 +29,7 @@ class SAM2Segment:
             raise RuntimeError("SAM2Segment detection assist model needs to be defined to use detect_segment")
 
         detections = self._detector.detect_objects(img_path, use_slice=use_slice_detection)[0]
+        print(f"DEBUG segment.py: detected {len(detections.xyxy)} in image {img_path}")
         masks = self._segment_detection(img_path, detections)
 
         return masks, self._masks_to_contours(masks)
@@ -79,12 +81,13 @@ class SAM2Segment:
         img = cv2.imread(img_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        with torch.no_grad():
-            self._predictor.set_image(img)
-            masks, _, _ = self._predictor.predict(point_coords=None,
-                                                  point_labels=None,
-                                                  box=boxes[None, :],
-                                                  multimask_output=False)
+        # with torch.no_grad():
+        self._predictor.set_image(img)
+        masks, _, _ = self._predictor.predict(point_coords=None,
+                                              point_labels=None,
+                                              box=boxes[None, :],
+                                              multimask_output=False)
+        print(f"_segment_detction on {img_path}: len(masks)={len(masks)}")
         return masks
 
     def _load_sam2(self, ckpt_path: str, cfg: str, custom_state_dict: str = None):

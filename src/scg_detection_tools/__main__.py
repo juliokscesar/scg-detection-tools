@@ -4,9 +4,11 @@ import os
 from scg_detection_tools.models import SUPPORTED_MODEL_TYPES
 import scg_detection_tools.models as md
 import scg_detection_tools.detect as det
-# import scg_detection_tools.segment as seg
+import scg_detection_tools.segment as seg
 from scg_detection_tools.utils.file_handling import get_all_files_from_paths
-from scg_detection_tools.utils.image_tools import box_annotated_image, plot_image, save_image
+from scg_detection_tools.utils.image_tools import (
+        box_annotated_image, segment_annotated_image, plot_image, save_image
+)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -66,6 +68,27 @@ def parse_args():
     seg_parser.add_argument("img_source",
                             nargs="*",
                             help="Source of image(s). Can be a single file, a list, or a directory")
+    seg_parser.add_argument("-p",
+                            "--ckpt-path",
+                            dest="ckpt_path",
+                            type=str,
+                            default=None,
+                            help="Path to SAM2 checkpoint")
+    seg_parser.add_argument("-c",
+                            "--config",
+                            type=str,
+                            default=None,
+                            help="SAM2 checkpoint config")
+                            
+    seg_parser.add_argument("-y",
+                            "--yolo-path",
+                            dest="yolo_path",
+                            type=str,
+                            default=None,
+                            help="Path to YOLO(v8,NAS) checkpoint")
+    seg_parser.add_argument("--yolov8",
+                            action="store_true",
+                            help="Use YOLOv8 model instead of YOLO-NAS")
     seg_parser.add_argument("--no-yolo-assist",
                             dest="disable_yolo",
                             action="store_true",
@@ -130,7 +153,45 @@ def detect(args):
 
 
 def segment(args):
-    pass
+    ckpt_path = args.ckpt_path
+    cfg = args.config
+    if not ckpt_path or not cfg:
+        raise RuntimeError("arguments --ckpt-path and --config are required for segment")
+
+    if args.disable_yolo:
+        raise Exception("No yolo assist not implemented yet")
+    
+    yolo_path = args.yolo_path
+    if not yolo_path:
+        raise RuntimeError("Segmentation with YOLO requires yolo checkpoint path")
+
+    if args.yolov8:
+        model = md.YOLOv8(yolov8_ckpt_path=yolo_path)
+    else:
+        # TODO: some way to support more classes and architectures in this cli tool
+        YN_ARCH = "yolo_nas_l"
+        YN_CLASSES = ["leaf"]
+
+        model = md.YOLO_NAS(YN_ARCH, yolo_path, YN_CLASSES)
+
+    img_source = args.img_source
+    img_files = get_all_files_from_paths(*img_source)
+    if len(img_files) == 0:
+        raise RuntimeError("At least one image source is required for segmentation")
+
+    sg = seg.SAM2Segment(sam2_ckpt_path=ckpt_path,
+                         sam2_cfg=cfg,
+                         detection_assist_model=model)
+
+    for img in img_files:
+        masks, contours = sg.detect_segment(img, (not args.no_slice))
+        print(f"len(masks)={len(masks)}. len(contours):{len(contours)}")
+        annotated = segment_annotated_image(img, masks)
+        if not args.no_show:
+            plot_image(annotated)
+        if args.save:
+            save_image(annotated, name=f"seg{os.path.basename(img)}", dir="out")
+
 
 def main():
     args = parse_args()
@@ -138,7 +199,7 @@ def main():
     
     FUNC_COMMAND = {
             "detect": detect,
-            "segemnt": segment,
+            "segment": segment,
     }
 
     if command is None:
