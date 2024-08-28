@@ -121,9 +121,6 @@ class YOLO_NAS(BaseDetectionModel):
         results = self._underlying_model.predict(img_path,
                                                  conf=confidence / 100.0,
                                                  iou=overlap / 100.0)
-        # DEBUG
-        print(f"DEBUG: YOLO-NAS results: {results}")
-
         detections = sv.Detections.from_yolo_nas(results)
         return detections
 
