@@ -14,8 +14,11 @@ def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thi
                                            detections=detections)
     return annotated_img
 
-def segment_annotated_image(default_imgpath: str, masks: np.ndarray) -> np.ndarray:
-    img = cv2.imread(default_imgpath)
+def segment_annotated_image(default_img: Union[str,np.ndarray], masks: np.ndarray) -> np.ndarray:
+    if isinstance(default_img, str):
+        img = cv2.imread(default_img)
+    else:
+        img = default_img
     masked_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
     masked_img[:,:,3] = 1.0
 
@@ -82,8 +85,8 @@ def crop_box_image(img: Union[np.ndarray, str],
     if isinstance(img, str):
         img = cv2.imread(img)
 
-    row0, col0 = box_xyxy[0]
-    row1, col1 = box_xyxy[1]
+    print(f"DEBUG image_tools.py: box={box_xyxy}")
+    row0, col0, row1, col1 = box_xyxy
     return img[col0:(col1+1), row0:(row1+1)]
 
 

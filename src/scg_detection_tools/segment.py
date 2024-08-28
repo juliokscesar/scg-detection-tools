@@ -5,6 +5,7 @@ import sam2
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 import supervision as sv
+from typing import Union
 
 from scg_detection_tools.detect import BaseDetectionModel, Detector
 
@@ -47,6 +48,8 @@ class SAM2Segment:
                 "masks": None,
                 "contours": None
             }
+            self._predictor.set_image(slice)
+            print("Calling segment on slice", slice_path)
             masks, _, _ = self._predictor.predict(point_coords=None,
                                                   point_labels=None,
                                                   box=slice_boxes[None, :],
@@ -64,9 +67,12 @@ class SAM2Segment:
         return result
 
 
-    def _segment_point(self, img_path: str, input_points: np.ndarray, input_labels: np.ndarray):
-        img = cv2.imread(img_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    def _segment_point(self, img_p: Union[str, np.ndarray], input_points: np.ndarray, input_labels: np.ndarray):
+        if isinstance(img_p, str):
+            img = cv2.imread(img_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        else:
+            img = img_p
 
         with torch.no_grad():
             self._predictor.set_image(img)
@@ -76,10 +82,13 @@ class SAM2Segment:
             
         return masks
 
-    def _segment_detection(self, img_path: str, detections: sv.Detections):
+    def _segment_detection(self, img_p: Union[str,np.ndarray], detections: sv.Detections):
         boxes = detections.xyxy.astype(np.int32)
-        img = cv2.imread(img_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if isinstance(img_p, str):
+            img = cv2.imread(img_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        else:
+            img = img_p
 
         # with torch.no_grad():
         self._predictor.set_image(img)
@@ -87,7 +96,6 @@ class SAM2Segment:
                                               point_labels=None,
                                               box=boxes[None, :],
                                               multimask_output=False)
-        print(f"_segment_detction on {img_path}: len(masks)={len(masks)}")
         return masks
 
     def _load_sam2(self, ckpt_path: str, cfg: str, custom_state_dict: str = None):
