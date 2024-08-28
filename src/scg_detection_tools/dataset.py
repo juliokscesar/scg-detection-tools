@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 import logging
 import shutil
+from typing import Tuple, List
+import numpy as np
 
 from scg_detection_tools.utils.file_handling import(
         get_all_files_from_paths, file_exists, read_yaml
@@ -83,3 +85,17 @@ class Dataset:
                     shutil.copyfile(data["annotations"], ann_path)
 
 
+
+def read_dataset_annotation(ann_file: str) -> Tuple[int, np.ndarray]:
+    if not file_exists(ann_file):
+        raise FileExistsError(f"File {ann_file} doesn't exist")
+    
+    nclass = -1
+    points = []
+    with open(ann_file, "r") as f:
+        for line in f:
+            data = line.split()
+            nclass = int(data[0])
+            points = [float(x) for x in data[1:]]
+
+    return (nclass, np.array(points))

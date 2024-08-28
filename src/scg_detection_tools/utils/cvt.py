@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple
 
-def cvt_segment_to_box(seg_contour: np.ndarray):
+def segment_to_box(seg_contour: np.ndarray):
     pass
 
 
@@ -10,7 +10,7 @@ def cvt_segment_to_box(seg_contour: np.ndarray):
 # is white
 # Each contour in 'contours' contains N points that describes the contour
 # but FLATTENED: countour = x0, y0, x1, y1, ..., xn, yn
-def cvt_contours_to_mask(contours: np.ndarray, imgsz: Tuple[int], normalized=True):
+def contours_to_mask(contours: np.ndarray, imgsz: Tuple[int], normalized=True):
     maskimg = np.zeros(imgsz, dtype=np.uint8)
     
     for contour in contours:
