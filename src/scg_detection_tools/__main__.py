@@ -1,11 +1,12 @@
 import argparse
 import os
+from pathlib import Path
 
 from scg_detection_tools.models import SUPPORTED_MODEL_TYPES
 import scg_detection_tools.models as md
 import scg_detection_tools.detect as det
 import scg_detection_tools.segment as seg
-from scg_detection_tools.utils.file_handling import get_all_files_from_paths
+from scg_detection_tools.utils.file_handling import get_all_files_from_paths, detections_to_file
 from scg_detection_tools.utils.image_tools import (
         box_annotated_image, segment_annotated_image, plot_image, save_image
 )
@@ -60,7 +61,7 @@ def parse_args():
                         default=10.0,
                         help="Slice overlap ratio when using slice detection. Default is 10.0")
 
-    det_parser.add_argument("--save", action="store_true", help="Save image with detections")
+    det_parser.add_argument("--save", action="store_true", help="Save image with detections and all detections boxes.")
     det_parser.add_argument("--no-show", action="store_true", dest="no_show", help="Don't plot image with detections")
 
 
@@ -140,9 +141,11 @@ def detect(args):
         "use_slice": args.slice,
         "slice_wh": (args.slice_w, args.slice_h),
         "slice_overlap_ratio": (args.slice_overlap, args.slice_overlap),
+        "embed_slice_callback": None,
     }
     detector = det.Detector(model, det_params)
-    detections = detector(img_files)
+    detections = detector.detect_objects(img_files)
+    print("img_files:", img_files, "len(det)=", len(detections))
     for img,detection in zip(img_files, detections):
         annotated = box_annotated_image(img, detection)
 
@@ -150,6 +153,7 @@ def detect(args):
             plot_image(annotated)
         if args.save:
             save_image(annotated, name=f"det{os.path.basename(img)}", dir="out")
+            detections_to_file(out_file=f"det{Path(img).stem}.detections", detections=detection)
 
 
 def segment(args):

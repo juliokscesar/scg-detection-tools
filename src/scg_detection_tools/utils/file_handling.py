@@ -1,6 +1,8 @@
 import os
 import shutil
 import yaml
+import supervision as sv
+import numpy as np
 
 def generete_temp_path(suffix: str) -> str:
     if not os.path.isdir(".temp"):
@@ -15,6 +17,7 @@ def clear_temp_folder():
 
 def file_exists(path: str) -> bool:
     return os.path.isfile(path)
+
 
 def get_all_files_from_paths(*args):
     files = []
@@ -31,10 +34,18 @@ def get_all_files_from_paths(*args):
 
     return files
 
+
 def read_yaml(yaml_file: str):
     content = {}
     with open(yaml_file, "r") as f:
         content = yaml.safe_load(f)
 
     return content
+
+
+def detections_to_file(out_file: str, detections: sv.Detections):
+    with open(out_file, "w") as f:
+        for box in detections.xyxy.astype(np.int32):
+            f.write(f"{' '.join([str(x) for x in box])}\n")
+
 

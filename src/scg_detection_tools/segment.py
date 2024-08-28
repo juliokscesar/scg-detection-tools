@@ -38,7 +38,7 @@ class SAM2Segment:
     def slice_segment_detect(self, img_path: str, slice_wh: tuple):
         result = {
             "original_image": img_path,
-            "bounding_boxes": None,
+            "detections": None,
             "slices": [],
         }
         
@@ -63,10 +63,10 @@ class SAM2Segment:
 
             result["slices"].append(slice_buffer)
 
-        full_bboxes = self._detector.detect_objects(img=img_path,
-                                                    use_slice=True,
-                                                    embed_slice_callback=segment_slice_callback)
-        result["bounding_boxes"] = full_bboxes
+        detections = self._detector.detect_objects(img=img_path,
+                                                   use_slice=True,
+                                                   embed_slice_callback=segment_slice_callback)[0]
+        result["detections"] = detections
         return result
 
 

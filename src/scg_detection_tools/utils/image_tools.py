@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from typing import Union
+import os
 
 from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 
@@ -58,6 +59,9 @@ def save_image(img: np.ndarray, name: str, dir: str = "exp", cvt_to_bgr=False, n
         elif img.shape[:-1] == 3:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     
+    if not os.path.isdir(dir):
+        os.mkdir(dir)
+
     out_file = f"{dir}/{name}"
     cv2.imwrite(out_file, img)
     
