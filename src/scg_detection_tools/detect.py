@@ -9,7 +9,7 @@ DEFAULT_DETECTION_PARAMS = {
 
         "use_slice": False,
         "slice_wh": (640, 640),
-        "slice_overlap_ratio": (0.1, 0.1),
+        "slice_overlap_ratio": (0.0, 0.0),
         "embed_slice_callback": None
 }
 
