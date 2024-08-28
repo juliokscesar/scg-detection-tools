@@ -45,9 +45,12 @@ class SAM2Segment:
         def segment_slice_callback(img_path: str, slice: np.ndarray, slice_path: str, slice_boxes: np.ndarray):
             slice_buffer = {
                 "path": slice_path,
-                "masks": None,
-                "contours": None
+                "masks": [],
+                "contours": []
             }
+            if len(slice_boxes) == 0:
+                return
+
             self._predictor.set_image(slice)
             print("Calling segment on slice", slice_path)
             masks, _, _ = self._predictor.predict(point_coords=None,
