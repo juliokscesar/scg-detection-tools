@@ -58,6 +58,11 @@ def parse_args():
                             dest="slice_overlap", 
                             default=10.0,
                             help="Slice overlap ratio when using slice detection. Default is 10.0")
+    det_parser.add_argument("--slice-iou",
+                            type=float,
+                            dest="slice_iou",
+                            default=40.0,
+                            help="Slice IOU threshold to filter duplicate detections")
 
     det_parser.add_argument("--save", action="store_true", help="Save image with detections and all detections boxes.")
     det_parser.add_argument("--no-show", action="store_true", dest="no_show", help="Don't plot image with detections")
@@ -140,6 +145,7 @@ def detect(args):
         "use_slice": args.slice,
         "slice_wh": (args.slice_w, args.slice_h),
         "slice_overlap_ratio": (args.slice_overlap/100.0, args.slice_overlap/100.0),
+        "slice_iou_threshold": args.slice_iou/100.0,
         "embed_slice_callback": None,
     }
     detector = det.Detector(model, det_params)

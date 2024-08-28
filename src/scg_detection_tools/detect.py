@@ -9,7 +9,8 @@ DEFAULT_DETECTION_PARAMS = {
 
         "use_slice": False,
         "slice_wh": (640, 640),
-        "slice_overlap_ratio": (0.0, 0.0),
+        "slice_overlap_ratio": (0.2, 0.2),
+        "slice_iou_threshold": 40.0,
         "embed_slice_callback": None
 }
 
@@ -43,6 +44,7 @@ class Detector:
                                                        overlap=self._det_params["overlap"],
                                                        slice_wh=self._det_params["slice_wh"],
                                                        slice_overlap_ratio=self._det_params["slice_overlap_ratio"],
+                                                       slice_iou_threshold=self._det_params["slice_iou_threshold"],
                                                        embed_slice_callback=self._det_params["embed_slice_callback"])
         else:
             detections = self._det_model.predict(img_path=image_path,

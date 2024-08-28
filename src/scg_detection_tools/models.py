@@ -37,6 +37,7 @@ class BaseDetectionModel(ABC):
                       overlap: float,
                       slice_wh: tuple,
                       slice_overlap_ratio: tuple,
+                      slice_iou_threshold: float,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         def sv_slice_callback(image: np.ndarray) -> sv.Detections:
             # Check if slice is smaller than the desired (640x640)
@@ -68,7 +69,8 @@ class BaseDetectionModel(ABC):
 
         slicer = sv.InferenceSlicer(callback=sv_slice_callback,
                                     slice_wh=slice_wh,
-                                    overlap_ratio_wh=slice_overlap_ratio)
+                                    overlap_ratio_wh=slice_overlap_ratio,
+                                    iou_threshold=slice_iou_threshold)
         sliced_detections = slicer(image=img)
 
         return sliced_detections
@@ -96,8 +98,9 @@ class YOLOv8(BaseDetectionModel):
                       overlap: float,
                       slice_wh: tuple,
                       slice_overlap_ratio: tuple,
+                      slice_iou_threshold: float,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
-        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, embed_slice_callback)
+        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
 
 
 class YOLO_NAS(BaseDetectionModel):
@@ -131,8 +134,9 @@ class YOLO_NAS(BaseDetectionModel):
                       overlap: float,
                       slice_wh: tuple,
                       slice_overlap_ratio: tuple,
+                      slice_iou_threshold: float,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
-        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, embed_slice_callback)
+        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
 
 
 class RoboflowModel(BaseDetectionModel):
@@ -158,6 +162,7 @@ class RoboflowModel(BaseDetectionModel):
                       overlap: float,
                       slice_wh: tuple,
                       slice_overlap_ratio: tuple,
+                      slice_iou_threshold: float,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
-        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, embed_slice_callback)
+        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
 
