@@ -7,6 +7,17 @@ import os
 
 from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 
+def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float) -> np.ndarray:
+    mask_img = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
+    color_img = np.full_like(mask_img, color, dtype=np.uint8)
+    alpha = 0.6
+    alpha_channel = (mask * alpha * 255).astype(np.uint8)
+    color_with_alpha = cv2.merge([color_img[:,:,0],
+                                  color_img[:,:,1],
+                                  color_img[:,:,2],
+                                  alpha_channel])
+    return color_with_alpha
+
 def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thickness: int = 1) -> np.ndarray:
     box_annotator = sv.BoxAnnotator(thickness=box_thickness)
     default_img = cv2.imread(default_imgpath)
@@ -18,23 +29,14 @@ def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thi
 def segment_annotated_image(default_img: Union[str,np.ndarray], masks: np.ndarray) -> np.ndarray:
     if isinstance(default_img, str):
         img = cv2.imread(default_img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
     else:
         img = default_img
-    masked_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
-    masked_img[:,:,3] = 1.0
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
 
-    mask_color = np.array([30/255, 144/255, 255/255, 1.0])
     for mask in masks:
-        h, w = mask.shape[-2:]
-        mask = mask.astype(np.uint8)
-        mask_img = mask.reshape(h,w,1) * mask_color.reshape(1,1,-1)
-
-        alpha_mask = mask_img[:,:,3]
-        alpha_dest = 1.0 - alpha_mask
-
-        for c in range(3):
-            masked_img[:,:,c] = (alpha_mask * mask_img[:,:,c] + alpha_dest * masked_img[:,:,c])
-    
+        maskimg = mask_img_alpha(mask=mask.astype(np.uint8), color=[30,6,255],alpha=0.6)
+        masked_img = cv2.addWeighted(img, 1.0, maskimg, 0.6, 0)
 
     return masked_img
 
@@ -60,7 +62,7 @@ def save_image(img: np.ndarray, name: str, dir: str = "exp", cvt_to_bgr=False, n
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     
     if not os.path.isdir(dir):
-        os.mkdir(dir)
+        os.makedirs(dir, exist_ok=True)
 
     out_file = f"{dir}/{name}"
     cv2.imwrite(out_file, img)
