@@ -106,7 +106,6 @@ class YOLOv8(BaseDetectionModel):
 class YOLO_NAS(BaseDetectionModel):
     def __init__(self, model_arch: str, checkpoint_path: str, classes: list):
         device = "cuda" if torch.cuda.is_available() else "cpu"
-
         self._model_arch = model_arch
         self._device = device
         self._classes = classes.copy()
