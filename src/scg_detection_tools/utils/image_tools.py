@@ -12,7 +12,6 @@ def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float) -> np.ndar
     color_img = np.full_like(mask_img, color, dtype=np.uint8)
     alpha = 0.6
     alpha_channel = (mask * alpha * 255).astype(np.uint8)
-    print(f"DEBUG mask_img_alpha: color_img shape: {color_img.shape}")
     color_with_alpha = cv2.merge([color_img[:,:,0],
                                   color_img[:,:,1],
                                   color_img[:,:,2],

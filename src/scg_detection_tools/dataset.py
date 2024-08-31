@@ -90,13 +90,13 @@ def read_dataset_annotation(ann_file: str) -> Tuple[int, list]:
     if not file_exists(ann_file):
         raise FileExistsError(f"File {ann_file} doesn't exist")
     
-    nclass = -1
+    nclasses = []
     contours = []
     with open(ann_file, "r") as f:
         for line in f:
             data = line.split()
-            nclass = int(data[0])
+            nclasses.append(int(data[0]))
             points = [float(x) for x in data[1:]]
             contours.append(points)
 
-    return (nclass, contours)
+    return (nclasses, contours)
