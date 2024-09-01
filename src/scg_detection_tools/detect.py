@@ -10,14 +10,20 @@ DEFAULT_DETECTION_PARAMS = {
         "use_slice": False,
         "slice_wh": (640, 640),
         "slice_overlap_ratio": (0.2, 0.2),
-        "slice_iou_threshold": 40.0,
+        "slice_iou_threshold": 0.4,
         "embed_slice_callback": None
 }
 
 class Detector:
-    def __init__(self, detection_model: BaseDetectionModel, detection_params = DEFAULT_DETECTION_PARAMS):
+    def __init__(self, detection_model: BaseDetectionModel, detection_params = DEFAULT_DETECTION_PARAMS, specific_det_params=None):
         self._det_model = detection_model
+        if detection_params is None:
+            detection_params = DEFAULT_DETECTION_PARAMS
         self._det_params = detection_params
+        
+        if specific_det_params is not None:
+            for spec_det_param in specific_det_params:
+                self._det_params[spec_det_param] = specific_det_params[spec_det_param]
 
     def __call__(self, img):
         return self.detect_objects(img)

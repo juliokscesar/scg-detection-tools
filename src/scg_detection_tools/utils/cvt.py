@@ -44,3 +44,43 @@ def boxes_to_masks(boxes: np.ndarray, imgsz: Tuple[int], normalized=False):
 
     return masks
 
+
+def detbox_to_yolo_fmt(boxes: np.ndarray, imgsz: Tuple[int], normalized=False):
+    yolo_boxes = []
+    imgw, imgh = imgsz
+    for box in boxes:
+        x1, y1, x2, y2 = box
+        # yolo dataset format is: class x_center y_center width height (all normalized)
+        x_center = float((x2 - x1)/2 + x1)
+        y_center = float((y2 - y1)/2 + y1)
+        width = float((x2-x1))
+        height = float((y2-y1))
+        if not normalized:
+            x_center /= imgw
+            y_center /= imgh
+            width /= imgw
+            height /= imgh
+        yolo_boxes.append([x_center, y_center, width, height])
+
+    return yolo_boxes
+
+def contour_to_yolo_fmt(contours: list, imgsz: Tuple[int], normalized=False):
+    """ 
+    Returns contours in YOLO format (normalized x1 x2 ... xn)
+    Contours must be a list of every contour in the image.
+    Contour is a list of points (x, y) of that contour
+    """
+    yolo_contours = []
+    imgw, imgh = imgsz
+    
+    for contour in contours:
+        if not isinstance(contour, np.ndarray):
+            contour = np.array(contour)
+        contour = contour.astype(np.float64)
+        if not normalized:
+            for point in contour:
+                point[0] /= float(imgw)
+                point[1] /= float(imgh)
+        yolo_contours.append(contour.reshape(contour.size))
+    return yolo_contours
+

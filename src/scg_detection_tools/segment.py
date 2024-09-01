@@ -52,7 +52,6 @@ class SAM2Segment:
                 return
 
             self._predictor.set_image(slice)
-            print("Calling segment on slice", slice_path)
             masks, _, _ = self._predictor.predict(point_coords=None,
                                                   point_labels=None,
                                                   box=slice_boxes[None, :],
@@ -65,7 +64,8 @@ class SAM2Segment:
 
         detections = self._detector.detect_objects(img=img_path,
                                                    use_slice=True,
-                                                   embed_slice_callback=segment_slice_callback)[0]
+                                                   embed_slice_callback=segment_slice_callback,
+                                                   slice_wh=slice_wh)[0]
         result["detections"] = detections
         return result
 
@@ -132,5 +132,15 @@ class SAM2Segment:
                 for points in contour:
                     fmt_contours[-1].append(points[0])
         mask_contours = fmt_contours
+
+        discard = []
+        for i in range(len(mask_contours)):
+            # Discard any contours with 4 or less points
+            # since it's very possible that it's just a mistake (creating boxes as seen in segmentations annotations)
+            if len(mask_contours[i]) <= 4:
+                discard.append(i)
+        for i in discard:
+            mask_contours.pop(i)
+
         return mask_contours
 

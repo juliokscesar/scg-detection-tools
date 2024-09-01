@@ -13,7 +13,7 @@ from scg_detection_tools.utils.file_handling import(
 DATASET_MODES = ["train", "val", "test"]
 # Manage datasets in YOLOv8 format
 class Dataset:
-    def __init__(self, name: str, dataset_dir: str, classes: list = ["leaf"]):
+    def __init__(self, name: str, dataset_dir: str, classes: List[str] = ["leaf"]):
         self._dataset = {
             "train": "train/images",
             "val": "valid/images",
@@ -42,8 +42,8 @@ class Dataset:
         ann_file = ".temp/" + Path(img_path).stem + ".txt"
         with open(ann_file, "w") as f:
             for ann in annotations:
-                f.write(f"{ann[0]} {' '.join([str(x) for x in ann[1:]])}")
-        
+                f.write(f"{int(ann[0])} {' '.join([str(float(x)) for x in ann[1:]])}\n")
+    
         data_img = {"image": img_path, "annotations": ann_file}
         self._data[mode].append(data_img)
 
@@ -63,7 +63,8 @@ class Dataset:
 
             for img in img_paths:
                 ann_file = os.path.join(ann_dir, Path(img).stem + ".txt")
-                data_img = {"image": img, "annotations": ""}
+                full_img_path = os.path.join(img_dir, img)
+                data_img = {"image": full_img_path, "annotations": ""}
                 if file_exists(ann_file):
                     data_img["annotations"] = ann_file
 
@@ -71,6 +72,7 @@ class Dataset:
 
 
     def save(self):
+        """ Save stored data to the output directory """
         for mode in DATASET_MODES:
             img_dir = os.path.join(self._dataset_dir, self._dataset[mode])
             ann_dir = img_dir[:-6] + "labels"
@@ -83,7 +85,12 @@ class Dataset:
                 ann_path = os.path.join(ann_dir, os.path.basename(data["annotations"]))
                 if not file_exists(ann_path):
                     shutil.copyfile(data["annotations"], ann_path)
+        print(f"Dataset {self._name}: saved images and annotations to {self._dataset_dir}. Remember to clean .temp folder")
 
+    
+    def get_data(self, mode="train"):
+        """ Return stored data as a list of dictionaries being: {"image": img_path, "annotation": ann_path} """
+        return self._data[mode]
 
 
 def read_dataset_annotation(ann_file: str) -> Tuple[int, list]:

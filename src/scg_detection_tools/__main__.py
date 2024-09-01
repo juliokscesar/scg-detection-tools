@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 from pathlib import Path
 
 from scg_detection_tools.models import SUPPORTED_MODEL_TYPES
@@ -113,6 +114,45 @@ def parse_args():
                             action="store_true",
                             help="Save image with masks")
 
+
+    gen_parser = subparsers.add_parser("generate", help="Generate dataset by saving detections/segmentations to annotation files")
+    gen_parser.add_argument("img_source",
+                            nargs="*",
+                            help="Source of images. Can be a single file, multiple, or directory")
+    gen_parser.add_argument("--model-type",
+                            type=str,
+                            default="yolov8",
+                            choices=SUPPORTED_MODEL_TYPES,
+                            help="Type of object detection model to use")
+    gen_parser.add_argument("--model-path",
+                            type=str,
+                            default=None,
+                            help="Path to model's checkpoint")
+    gen_parser.add_argument("--sam2-ckpt",
+                            dest="sam2_ckpt",
+                            type=str,
+                            default=None,
+                            help="Path to SAM2 checkpoint")
+    gen_parser.add_argument("--sam2-cfg",
+                            dest="sam2_cfg",
+                            type=str,
+                            default="sam2_hiera_t.yaml",
+                            help="SAM2 config to use if saving segments annotations")
+    gen_parser.add_argument("--out-dir",
+                            dest="out_dir",
+                            type=str,
+                            default="gen_out",
+                            help="Output directory of generated dataset")
+    gen_annotations = gen_parser.add_mutually_exclusive_group(required=True)
+    gen_annotations.add_argument("--boxes", action="store_true", help="Save YOLO detection boxes annotations")
+    gen_annotations.add_argument("--segments", action="store_true", help="Save SAM2 segments annotations")
+
+    gen_parser.add_argument("--data-classes",
+                            nargs="*",
+                            default=["leaf"],
+                            help="Classes to use in annotations")
+
+
     return parser.parse_args()
 
 def detect(args):
@@ -202,6 +242,65 @@ def segment(args):
         if args.save:
             save_image(annotated, name=f"seg{os.path.basename(img)}", dir="out")
 
+def generate(args):
+    import scg_detection_tools.detect as det
+    import scg_detection_tools.segment as seg
+    from scg_detection_tools.dataset import Dataset
+
+    img_files = get_all_files_from_paths(*args.img_source)
+    
+    gen_dataset = Dataset(name="gen_dataset", dataset_dir=args.out_dir, classes=args.data_classes)
+
+    model_t = args.model_type
+    if model_t == "yolov8":
+        model = md.YOLOv8(yolov8_ckpt_path=args.model_path)
+    elif model_t == "yolonas":
+        model = md.YOLO_NAS(model_arch="yolo_nas_l", checkpoint_path=args.model_path, classes=args.data_classes)
+    else:
+        raise RuntimeError(f"Support for model {model_t} not implemented for dataset generation")
+
+    detector = det.Detector(model, detection_params=None, specific_det_params={"use_slice": True})
+    for img in img_files:
+        curr_data = gen_dataset.get_data(mode="train")
+        if args.boxes:
+            from scg_detection_tools.utils.cvt import detbox_to_yolo_fmt
+            def save_slice_callback(img_path, sliceimg, tmppath, det_boxes):
+                slice_img_path = f".temp/slice_det{len(curr_data)}_{os.path.basename(img)}"
+                shutil.copyfile(src=tmppath, dst=slice_img_path)
+
+                fmt_boxes = detbox_to_yolo_fmt(boxes=det_boxes, imgsz=sliceimg.shape[1::-1]) # sliceimg.shape is (h,w,c) but we want (w,h)
+                slice_ann = []
+                for box in fmt_boxes:
+                    slice_ann.append([0])
+                    slice_ann[-1].extend(box)
+
+                gen_dataset.add(img_path=slice_img_path, annotations=slice_ann)
+            detections = detector.detect_objects(img=img, embed_slice_callback=save_slice_callback)[0]
+            print(f"GENERATOR: finished detections for image {img}. Counted: {len(detections.xyxy)}")
+
+        elif args.segments:
+            from scg_detection_tools.utils.cvt import contour_to_yolo_fmt
+            sg = seg.SAM2Segment(sam2_ckpt_path=args.sam2_ckpt,
+                                 sam2_cfg=args.sam2_cfg,
+                                 detection_assist_model=model)
+            seg_results = sg.slice_segment_detect(img_path=img, slice_wh=(640,640))
+            print(f"GENERATOR: finished detecitons and segmentations of slices for image {img}. Counted: {len(seg_results['detections'].xyxy)}")
+            
+            for slice in seg_results["slices"]:
+                slice_tmp_path = slice["path"]
+                slice_img_path = f".temp/slice_seg{len(curr_data)}_{os.path.basename(img)}"
+                shutil.copyfile(src=slice_tmp_path, dst=slice_img_path)
+
+                fmt_contours = contour_to_yolo_fmt(slice["contours"], imgsz=(640,640))
+                slice_ann = []
+                for contour in fmt_contours:
+                    slice_ann.append([0])
+                    slice_ann[-1].extend(contour)
+
+                gen_dataset.add(img_path=slice_img_path, annotations=slice_ann)
+
+    gen_dataset.save()
+
 
 def main():
     args = parse_args()
@@ -210,6 +309,7 @@ def main():
     FUNC_COMMAND = {
             "detect": detect,
             "segment": segment,
+            "generate": generate,
     }
 
     if command is None:
