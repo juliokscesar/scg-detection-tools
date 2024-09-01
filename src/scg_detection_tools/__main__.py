@@ -178,7 +178,7 @@ def detect(args):
         model = md.YOLOv8(model_path)
     elif model_type == "yolonas":
         YN_ARCH = "yolo_nas_l"
-        YN_CLASSES = "leaf"
+        YN_CLASSES = ["leaf"]
         model = md.YOLO_NAS(YN_ARCH, model_path, YN_CLASSES)
     elif model_type == "roboflow":
         project = input("Roboflow project: ")
