@@ -33,7 +33,7 @@ class SAM2Segment:
         print(f"DEBUG segment.py: detected {len(detections.xyxy)} in image {img_path}")
         masks = self._segment_detection(img_path, detections)
 
-        return masks, self._masks_to_contours(masks)
+        return masks, self._sam2masks_to_contours(masks)
 
     def slice_segment_detect(self, img_path: str, slice_wh: tuple):
         result = {
@@ -57,7 +57,7 @@ class SAM2Segment:
                                                   point_labels=None,
                                                   box=slice_boxes[None, :],
                                                   multimask_output=False)
-            contours = self._masks_to_contours(masks)
+            contours = self._sam2masks_to_contours(masks)
             slice_buffer["masks"] = masks
             slice_buffer["contours"] = contours
 
@@ -112,7 +112,7 @@ class SAM2Segment:
 
         return predictor
 
-    def _masks_to_contours(self, masks: np.ndarray):
+    def _sam2masks_to_contours(self, masks: np.ndarray):
         mask_contours = []
         for mask in masks:
             h, w = mask.shape[-2:]
