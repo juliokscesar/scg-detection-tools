@@ -6,6 +6,8 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 import supervision as sv
 from typing import Union
+import threading
+import queue
 
 from scg_detection_tools.detect import BaseDetectionModel, Detector
 
@@ -22,14 +24,27 @@ class SAM2Segment:
         if self._detection_model:
             self._detector = Detector(detection_assist_model)
 
+    def _alt_thread_detect(self, img_path: str, use_slice: bool):
+        def _call_detection(img_path, use_slice, que):
+            detections = self._detector.detect_objects(img_path, use_slice=use_slice)[0]
+            que.put(detections)
+
+        result_queue = queue.Queue()
+        t = threading.Thread(target=_call_detection, args=(img_path, use_slice, result_queue))
+        t.start()
+        t.join()
+        return result_queue.get()
+        
     
     def detect_segment(self,
                        img_path: str,
                        use_slice_detection = False):
         if not self._detector or not self._detection_model:
             raise RuntimeError("SAM2Segment detection assist model needs to be defined to use detect_segment")
+        
+        detections = self._alt_thread_detect(img_path, use_slice_detection)
+        assert(detections is not None)
 
-        detections = self._detector.detect_objects(img_path, use_slice=use_slice_detection)[0]
         print(f"DEBUG segment.py: detected {len(detections.xyxy)} in image {img_path}")
         masks = self._segment_detection(img_path, detections)
 
@@ -88,7 +103,7 @@ class SAM2Segment:
     def _segment_detection(self, img_p: Union[str,np.ndarray], detections: sv.Detections):
         boxes = detections.xyxy.astype(np.int32)
         if isinstance(img_p, str):
-            img = cv2.imread(img_path)
+            img = cv2.imread(img_p)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         else:
             img = img_p
