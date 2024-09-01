@@ -329,7 +329,7 @@ def generate(args):
 
                 gen_dataset.add(img_path=img, annotations=img_ann)
 
-    gen_dataset.save()
+        gen_dataset.save()
 
 
 def main():
