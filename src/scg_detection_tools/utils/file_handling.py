@@ -43,9 +43,11 @@ def read_yaml(yaml_file: str):
     return content
 
 
-def detections_to_file(out_file: str, detections: sv.Detections):
+def detections_to_file(out_file: str, detections: sv.Detections = None, boxes = None):
     with open(out_file, "w") as f:
-        for box in detections.xyxy.astype(np.int32):
+        if detections is not None:
+            boxes = detections.xyxy.astype(np.int32)
+        for box in boxes:
             f.write(f"{' '.join([str(x) for x in box])}\n")
 
 

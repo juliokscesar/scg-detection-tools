@@ -68,6 +68,7 @@ type=float,
 
     det_parser.add_argument("--save", action="store_true", help="Save image with detections and all detections boxes.")
     det_parser.add_argument("--no-show", action="store_true", dest="no_show", help="Don't plot image with detections")
+    det_parser.add_argument("--cache-detections", action="store_true", dest="cache_detections", help="Save each box coordinates to a file")
 
 
     seg_parser = subparsers.add_parser("segment", help="Run instance segmentation on images using SAM2")
@@ -188,6 +189,19 @@ def detect(args):
 
     img_files = get_all_files_from_paths(*img_source)
     
+    slice_count = 0
+    if args.cache_detections and args.slice:
+        if not os.path.isdir("out_cache"):
+            os.mkdir("out_cache")
+        def _on_slice_save_detections(img_path, sliceimg, tmppath, boxes):
+            nonlocal slice_count
+            shutil.copyfile(tmppath, f"out_cache/slice_{slice_count}_det{os.path.basename(img_path)}")
+            detections_to_file(out_file=f"out_cache/slice_{slice_count}_det{os.path.basename(img_path)}.detections", boxes=boxes)
+            slice_count += 1
+        embed_slice_callback = _on_slice_save_detections
+    else:
+        embed_slice_callback = None
+
     det_params = {
         "confidence": args.confidence,
         "overlap": args.overlap,
@@ -195,7 +209,7 @@ def detect(args):
         "slice_wh": (args.slice_w, args.slice_h),
         "slice_overlap_ratio": (args.slice_overlap/100.0, args.slice_overlap/100.0),
         "slice_iou_threshold": args.slice_iou/100.0,
-        "embed_slice_callback": None,
+        "embed_slice_callback": embed_slice_callback,
     }
     detector = det.Detector(model, det_params)
     detections = detector.detect_objects(img_files)
@@ -207,7 +221,8 @@ def detect(args):
             plot_image(annotated)
         if args.save:
             save_image(annotated, name=f"det{os.path.basename(img)}", dir="out")
-            detections_to_file(out_file=f"det{Path(img).stem}.detections", detections=detection)
+            if args.cache_detections:
+                detections_to_file(out_file=f"out_cache/det{os.path.basename(img)}.detections", detections=detection)
 
 
 def segment(args):
