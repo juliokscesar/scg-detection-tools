@@ -181,6 +181,7 @@ class YOLO_NAS(BaseDetectionModel):
             num_gpus = 0
 
         train_yolo_nas(dataset_dir=dataset_dir,
+                       model_arch=self._model_arch,
                        epochs=epochs,
                        batch=batch,
                        workers=workers,
