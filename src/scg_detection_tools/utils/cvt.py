@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Tuple
 import cv2
+import numbers
 
 def segment_to_box(seg_contour: np.ndarray):
     pass
@@ -15,8 +16,11 @@ def contours_to_masks(contours: list, imgsz: Tuple[int], normalized=True):
     masks = []
 
     for contour in contours:
-        # reshape list into pairs of (x,y) coordinates
-        points = np.array(contour).reshape(len(contour)//2, 2)
+        # if contour comes as a flat array reshape list into pairs of (x,y) coordinates
+        if isinstance(contour[0], numbers.Number):
+            points = np.array(contour).reshape(len(contour)//2, 2)
+        else:
+            points = np.array(contour.copy())
 
         if normalized:
             points = np.int32(points * np.array(imgsz[::-1]))

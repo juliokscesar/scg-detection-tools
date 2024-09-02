@@ -10,7 +10,6 @@ from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float) -> np.ndarray:
     mask_img = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
     color_img = np.full_like(mask_img, color, dtype=np.uint8)
-    alpha = 0.6
     alpha_channel = (mask * alpha * 255).astype(np.uint8)
     color_with_alpha = cv2.merge([color_img[:,:,0],
                                   color_img[:,:,1],
@@ -26,18 +25,24 @@ def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thi
                                            detections=detections)
     return annotated_img
 
-def segment_annotated_image(default_img: Union[str,np.ndarray], masks: np.ndarray) -> np.ndarray:
+def segment_annotated_image(default_img: Union[str,np.ndarray], mask: np.ndarray, color: np.ndarray, alpha: float) -> np.ndarray:
     if isinstance(default_img, str):
         img = cv2.imread(default_img)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
     else:
         img = default_img
         img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
+    img[:,:,3] = 255
 
-    for mask in masks:
-        maskimg = mask_img_alpha(mask=mask.astype(np.uint8), color=[30,6,255],alpha=0.6)
-        masked_img = cv2.addWeighted(img, 1.0, maskimg, 0.6, 0)
+    maskimg = mask_img_alpha(mask=mask.astype(np.uint8), color=color, alpha=alpha)
 
+    alpha_im = img[:,:,3] / 255.0
+    alpha_mk = maskimg[:,:,3] / 255.0
+    
+    masked_img = img.copy()
+    for c in range(0,3):
+        masked_img[:,:,c] = alpha_mk * maskimg[:,:,c] + alpha_im * masked_img[:,:,c] * (1 - alpha_mk)
+    
     return masked_img
 
 def plot_image(img: np.ndarray, cvt_to_rgb=True):

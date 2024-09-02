@@ -93,6 +93,20 @@ class Dataset:
         return self._data[mode]
 
 
+    def annotations_of(img_path: str, mode="train"):
+        """ Return annotation classes and contours from annotation file """
+        ann_file = None
+        for data in self._data[mode]:
+            if data["image"] == img_path:
+                ann_file = data["annotations"]
+                break
+
+        if ann_file is None:
+            raise ValueError(f"{img_path} not in dataset")
+        
+        return read_dataset_annotation(ann_file)
+
+
 def read_dataset_annotation(ann_file: str) -> Tuple[int, list]:
     if not file_exists(ann_file):
         raise FileExistsError(f"File {ann_file} doesn't exist")
