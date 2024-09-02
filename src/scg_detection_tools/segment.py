@@ -50,6 +50,7 @@ class SAM2Segment:
 
         return masks, self._sam2masks_to_contours(masks)
 
+
     def slice_segment_detect(self, img_path: str, slice_wh: tuple):
         result = {
             "original_image": img_path,
@@ -102,17 +103,22 @@ class SAM2Segment:
 
     def _segment_detection(self, img_p: Union[str,np.ndarray], detections: sv.Detections):
         boxes = detections.xyxy.astype(np.int32)
+        return _segment_boxes(img_p, boxes)
+
+    def _segment_boxes(self, img_p: Union[str,np.ndarray], boxes: np.ndarray):
         if isinstance(img_p, str):
             img = cv2.imread(img_p)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         else:
             img = img_p
 
-        # with torch.no_grad():
+        if not isinstance(boxes, np.ndarray):
+            boxes = np.array(boxes)
+
         self._predictor.set_image(img)
         masks, _, _ = self._predictor.predict(point_coords=None,
                                               point_labels=None,
-                                              box=boxes[None, :],
+                                              box=boxes[None,:],
                                               multimask_output=False)
         return masks
 

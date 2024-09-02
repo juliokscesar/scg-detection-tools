@@ -3,10 +3,11 @@ import os
 import shutil
 from pathlib import Path
 import cv2
+import warnings
 
 from scg_detection_tools.models import SUPPORTED_MODEL_TYPES
 import scg_detection_tools.models as md
-from scg_detection_tools.utils.file_handling import get_all_files_from_paths, detections_to_file
+from scg_detection_tools.utils.file_handling import get_all_files_from_paths, detections_to_file, read_detection_boxes_file
 from scg_detection_tools.utils.image_tools import (
         box_annotated_image, segment_annotated_image, plot_image, save_image
 )
@@ -161,6 +162,11 @@ type=float,
                             nargs="*",
                             default=["leaf"],
                             help="Classes to use in annotations")
+    gen_parser.add_argument("--cached-detections",
+                            dest="cached_detections",
+                            type=str,
+                            default=None,
+                            help="Use cached detections (boxes coordinates written to a file)")
 
 
     return parser.parse_args()
@@ -312,6 +318,32 @@ def generate(args):
                 gen_dataset.add(img_path=img, annotations=img_ann)
 
             print(f"GENERATOR: finished detections for image {img}. Counted: {len(detections.xyxy)}")
+
+        elif args.segments and args.cached_detections:
+            from scg_detection_tools.utils.cvt import contour_to_yolo_fmt
+            cache_loc = args.cached_detections
+            cache_files = get_all_files_from_paths(cache_loc)
+            boxes = None
+            for cache_file in cache_files:
+                # if image is img.png, cache file will be img.png.detections
+                if Path(cache_file).stem == os.path.basename(img):
+                    boxes = read_detection_boxes_file(cache_file)
+                    break
+            if boxes is None:
+                warnings.warn(f"No cached detection file found for {img}, skipping...")
+                continue
+            sg = seg.SAM2Segment(sam2_ckpt_path=args.sam2_ckpt,
+                                 sam2_cfg=args.sam2_cfg,
+                                 detection_assist_model=model)
+            masks = sg._segment_boxes(img_p=img, boxes=boxes)
+            contours = sg._sam2masks_to_contours(masks)
+            fmt_contours = contour_to_yolo_fmt(contours, imgsz=(cv2.imread(img).shape[1::-1]))
+            img_ann = []
+            for contour in fmt_contours:
+                img_ann.append([0])
+                img_ann[-1].extend(contour)
+            gen_dataset.add(img_path=img, annotations=img_ann)
+
 
         elif args.segments:
             from scg_detection_tools.utils.cvt import contour_to_yolo_fmt

@@ -48,6 +48,13 @@ def detections_to_file(out_file: str, detections: sv.Detections = None, boxes = 
         if detections is not None:
             boxes = detections.xyxy.astype(np.int32)
         for box in boxes:
-            f.write(f"{' '.join([str(x) for x in box])}\n")
+            f.write(f"{' '.join([str(int(x)) for x in box])}\n")
 
+def read_detection_boxes_file(file: str) -> np.ndarray:
+    boxes = []
+    with open(file, "r") as f:
+        for line in f:
+            box = [int(x) for x in line.strip().split()]
+            boxes.append(box)
+    return boxes
 
