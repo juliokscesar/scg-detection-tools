@@ -277,7 +277,7 @@ def generate(args):
     import scg_detection_tools.segment as seg
     from scg_detection_tools.dataset import Dataset
 
-    img_files = get_all_files_from_paths(*args.img_source)
+    img_files = get_all_files_from_paths(*args.img_source, skip_ext=[".txt", ".detections", ".json"])
     
     gen_dataset = Dataset(name="gen_dataset", dataset_dir=args.out_dir, classes=args.data_classes)
 
@@ -322,7 +322,7 @@ def generate(args):
         elif args.segments and args.cached_detections:
             from scg_detection_tools.utils.cvt import contour_to_yolo_fmt
             cache_loc = args.cached_detections
-            cache_files = get_all_files_from_paths(cache_loc)
+            cache_files = get_all_files_from_paths(cache_loc, skip_ext=[".png", ".jpeg", ".jpg"])
             boxes = None
             for cache_file in cache_files:
                 # if image is img.png, cache file will be img.png.detections

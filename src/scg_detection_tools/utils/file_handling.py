@@ -3,6 +3,7 @@ import shutil
 import yaml
 import supervision as sv
 import numpy as np
+from typing import List
 
 def generete_temp_path(suffix: str) -> str:
     if not os.path.isdir(".temp"):
@@ -18,16 +19,21 @@ def clear_temp_folder():
 def file_exists(path: str) -> bool:
     return os.path.isfile(path)
 
+def file_ext(file_path: str) -> str:
+    _, ext = os.path.splitext(file_path)
+    return ext
 
-def get_all_files_from_paths(*args):
+def get_all_files_from_paths(*args, skip_ext: List[str] = None):
     files = []
     for path in args:
         if os.path.isfile(path):
+            if file_ext(path) in skip_ext:
+                continue
             files.append(path)
 
         elif os.path.isdir(path):
             for (root, _, filenames) in os.walk(path):
-                files.extend([os.path.join(root, file) for file in filenames])
+                files.extend([os.path.join(root, file) for file in filenames if file_ext(file) not in skip_ext])
         
         else:
             raise RuntimeError(f"{path} is an invalid file source")
