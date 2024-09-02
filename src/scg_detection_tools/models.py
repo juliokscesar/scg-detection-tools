@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, Union
 
 import numpy as np
 import cv2
@@ -9,19 +9,21 @@ from super_gradients.training import models
 from roboflow import Roboflow
 import supervision as sv
 from pathlib import Path
+import os
 
-from scg_detection_tools.utils.file_handling import generete_temp_path, clear_temp_folder
+from scg_detection_tools.utils.file_handling import generete_temp_path, clear_temp_folder, file_exists
 
 SUPPORTED_MODEL_TYPES = ["yolov8", "yolonas", "roboflow"]
 
 FnEmbedSliceCallback: type = Callable[[str, np.ndarray, str, np.ndarray], None]
 
 class BaseDetectionModel(ABC):
-    def __init__(self, model_type: str, underlying_model):
+    def __init__(self, model_type: str, model_ckpt_path: str, underlying_model):
         if model_type not in SUPPORTED_MODEL_TYPES:
             raise Exception(f"model_type {model_type} is not supported. Possible options are: {SUPPORTED_MODEL_TYPES}")
 
         self._model_type = model_type
+        self._model_ckpt_path = model_ckpt_path
         self._underlying_model = underlying_model
 
 
@@ -76,10 +78,20 @@ class BaseDetectionModel(ABC):
         return sliced_detections
 
 
+    @abstractmethod
+    def train(self, 
+              dataset_dir: str, 
+              epochs=30, 
+              batch=8, 
+              device: Union[list, str, int] = "cpu", 
+              workers=6):
+        pass
+
+
 class YOLOv8(BaseDetectionModel):
     def __init__(self, yolov8_ckpt_path: str):
         yolo_model = YOLO(yolov8_ckpt_path)
-        super().__init__(model_type="yolov8", underlying_model=yolo_model)
+        super().__init__(model_type="yolov8", model_ckpt_path=yolov8_ckpt_path, underlying_model=yolo_model)
 
 
     def predict(self, img_path: str, confidence: float, overlap: float) -> sv.Detections:
@@ -102,6 +114,20 @@ class YOLOv8(BaseDetectionModel):
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
 
+    def train(self, 
+              dataset_dir: str, 
+              epochs=30, 
+              batch=8, 
+              device: Union[list, str, int] = "cpu", 
+              workers=6):
+        
+        data_yaml = os.path.join(dataset_dir, "data.yaml")
+        if not file_exists(data_yaml):
+            raise FileExistsError(f"No 'data.yaml' found in dataset directory {dataset_dir}")
+
+        results = model.train(data=data_yaml, imgsz=640, epochs=epochs, batch=batch, device=device, workers=workers)
+        return results
+
 
 class YOLO_NAS(BaseDetectionModel):
     def __init__(self, model_arch: str, checkpoint_path: str, classes: list):
@@ -113,7 +139,7 @@ class YOLO_NAS(BaseDetectionModel):
         model = models.get(model_arch, num_classes=len(classes), checkpoint_path=checkpoint_path)
         model.to(device)
 
-        super().__init__(model_type="yolonas", underlying_model=model)
+        super().__init__(model_type="yolonas", model_ckpt_path=checkpoint_path, underlying_model=model)
 
 
     def predict(self, img_path: str, confidence: float, overlap: float) -> sv.Detections:
@@ -133,6 +159,36 @@ class YOLO_NAS(BaseDetectionModel):
                       slice_iou_threshold: float,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
+
+
+    def train(self, 
+              dataset_dir: str, 
+              epochs=30, 
+              batch=8, 
+              device: Union[list, str, int] = "cpu", 
+              workers=6):
+        from scg_detection_tools.utils.yolonas_train import train_yolo_nas
+
+        if not file_exists(os.path.join(dataset_dir, "data.yaml")):
+            raise FileExistsError(f"No 'data.yaml' found in dataset directory {dataset_dir}")
+
+        num_gpus = 1
+        multi_gpu = False
+        if isinstance(device, list):
+            num_gpus = len(device)
+            multi_gpu = True
+        elif isinstance(device, str):
+            num_gpus = 0
+
+        train_yolo_nas(dataset_dir=dataset_dir,
+                       epochs=epochs,
+                       batch=batch,
+                       workers=workers,
+                       multi_gpu=multi_gpu,
+                       num_gpus=num_gpus,
+                       pretrained_checkpoint_path=self._model_ckpt_path)
+        return True
+
 
 
 class RoboflowModel(BaseDetectionModel):
@@ -161,4 +217,14 @@ class RoboflowModel(BaseDetectionModel):
                       slice_iou_threshold: float,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
+
+
+    def train(self, 
+              dataset_dir: str, 
+              epochs=30, 
+              batch=8, 
+              device: Union[list, str, int] = "cpu", 
+              workers=6):
+        raise Exception("Roboflow model does not support training")
+
 
