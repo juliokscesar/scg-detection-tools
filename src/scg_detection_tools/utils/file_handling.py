@@ -27,13 +27,17 @@ def get_all_files_from_paths(*args, skip_ext: List[str] = None):
     files = []
     for path in args:
         if os.path.isfile(path):
-            if file_ext(path) in skip_ext:
-                continue
+            if skip_ext is not None:
+                if file_ext(path) in skip_ext:
+                    continue
             files.append(path)
 
         elif os.path.isdir(path):
             for (root, _, filenames) in os.walk(path):
-                files.extend([os.path.join(root, file) for file in filenames if file_ext(file) not in skip_ext])
+                if skip_ext is not None:
+                    files.extend([os.path.join(root, file) for file in filenames if file_ext(file) not in skip_ext])
+                else:
+                    files.extend([os.path.join(root, file) for file in filenames])
         
         else:
             raise RuntimeError(f"{path} is an invalid file source")

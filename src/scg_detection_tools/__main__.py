@@ -193,7 +193,7 @@ def detect(args):
         api_key = os.getenv("ROBOFLOW_API_KEY")
         model = md.RoboflowModel(api_key, project, version)
 
-    img_files = get_all_files_from_paths(*img_source)
+    img_files = get_all_files_from_paths(*img_source, skip_ext=[".txt", ".json", ".detections"])
     
     slice_count = 0
     if args.cache_detections and args.slice:
