@@ -125,7 +125,7 @@ class YOLOv8(BaseDetectionModel):
         if not file_exists(data_yaml):
             raise FileExistsError(f"No 'data.yaml' found in dataset directory {dataset_dir}")
 
-        results = model.train(data=data_yaml, imgsz=640, epochs=epochs, batch=batch, device=device, workers=workers)
+        results = self._underlying_model.train(data=data_yaml, imgsz=640, epochs=epochs, batch=batch, device=device, workers=workers)
         return results
 
 

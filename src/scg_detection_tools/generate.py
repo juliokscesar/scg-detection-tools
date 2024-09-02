@@ -1,5 +1,6 @@
 from typing import List
 import shutil
+import cv2
 
 from scg_detection_tools.models import BaseDetectionModel
 from scg_detection_tools.detect import Detector
@@ -18,7 +19,7 @@ def generate_dataset(name: str,
                      gen_on_slice=False,
                      slice_detect=False,
                      imgboxes_for_segments: dict = None):
-    if (not use_boxes) or (not use_segments):
+    if (not use_boxes) and (not use_segments):
         raise ValueError("generate_dataset require either use_boxes or use_segments to be true")
 
     gen_dataset = Dataset(name=name, dataset_dir=out_dir, classes=classes)
@@ -40,7 +41,7 @@ def generate_dataset(name: str,
                     gen_dataset.add(img_path=slice_img_path, annotations=slice_ann)
             else:
                 detections = detector.detect_objects(img)[0]
-                img_ann = annotation_boxes(boxes=detections.xyxy, imgsz=cv2.imread(img).shape[1::-1])
+                img_ann = annotation_boxes(detections.xyxy, imgsz=cv2.imread(img).shape[1::-1])
                 gen_dataset.add(img_path=img, annotations=img_ann)
 
         ######################################################################################
