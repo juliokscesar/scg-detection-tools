@@ -135,12 +135,11 @@ class Dataset:
 
     def split_modes(self, src="train", dest="val", ratio=0.1):
         """ Split images from one mode to another. The amount to be transfered is ratio*src_amount. The images are randomly selected """
-        src_amount = len(self._data[src])
         n_transfer = int(src_amount * ratio) + 1
         
         rng = np.random.default_rng()
         for _ in range(n_transfer):
-            trans_idx = rng.integers(src_amount)
+            trans_idx = rng.integers(len(self._data[src]))
 
             data = self._data[src].pop(trans_idx)
         
