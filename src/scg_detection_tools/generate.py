@@ -48,7 +48,7 @@ def generate_dataset(name: str,
     detector = Detector(model, specific_det_params={"use_slice": slice_detect})
     for img in img_files:
         # keep track of current amount of images to correctly name images
-        curr_data_len = len(gen_dataset.get_data(mode="train"))
+        curr_data_len = 0
 
         added_imgs = []
         added_anns = []
@@ -57,12 +57,13 @@ def generate_dataset(name: str,
         if use_boxes:
             if gen_on_slice:
                 def _save_slice_callback(img_path, sliceimg, tmppath, det_boxes):
+                    nonlocal curr_data_len
                     slice_img_path = f".temp/slice_det{curr_data_len}_{os.path.basename(img_path)}"
                     shutil.copyfile(src=tmppath, dst=slice_img_path)
 
                     slice_ann = annotation_boxes(det_boxes, sliceimg.shape[1::-1])
                     gen_dataset.add(img_path=slice_img_path, annotations=slice_ann)
-
+                    curr_data_len += 1
                     nonlocal added_imgs, added_anns
                     added_imgs.append(slice_img_path)
                     added_anns.append(slice_ann)
