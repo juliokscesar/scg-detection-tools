@@ -50,8 +50,8 @@ def generate_dataset(name: str,
         # keep track of current amount of images to correctly name images
         curr_data_len = len(gen_dataset.get_data(mode="train"))
 
-        final_img = None
-        final_ann = None
+        added_imgs = []
+        added_anns = []
         ######################################################################################
 
         if use_boxes:
@@ -62,13 +62,18 @@ def generate_dataset(name: str,
 
                     slice_ann = annotation_boxes(det_boxes, sliceimg.shape[1::-1])
                     gen_dataset.add(img_path=slice_img_path, annotations=slice_ann)
+
+                    nonlocal added_imgs, added_anns
+                    added_imgs.append(slice_img_path)
+                    added_anns.append(slice_ann)
+
                 
                 detector.detect_objects(img, embed_slice_callback=_save_slice_callback)
             else:
                 detections = detector.detect_objects(img)[0]
                 img_ann = annotation_boxes(detections.xyxy, imgsz=cv2.imread(img).shape[1::-1])
-                final_img = img
-                final_ann = img_ann
+                added_imgs.append(img)
+                added_anns.append(img_ann)
 
 
         ######################################################################################
@@ -91,6 +96,8 @@ def generate_dataset(name: str,
                     slice_ann = annotation_contours(slice["contours"], imgsz=(640,640))
 
                     gen_dataset.add(img_path=slice_path, annotations=slice_ann)
+                    added_imgs.append(slice_path)
+                    added_anns.append(slice_ann)
             else:
                 if imgboxes_for_segments is not None:
                     masks = seg._segment_boxes(img_p=img, boxes=imgboxes_for_segments[img])
@@ -100,35 +107,21 @@ def generate_dataset(name: str,
 
                 img_ann = annotation_contours(contours, imgsz=cv2.imread(img).shape[1::-1])
 
-                final_img = img
-                final_ann = img_ann
-    
+                added_imgs.append(img)
+                added_anns.append(img_ann)
 
         ######################################################################################
 
         gen_dataset.save()
     
         if not gen_on_slice:
-            gen_dataset.add(img_path=final_img, annotations=final_ann)
+            for img_path, img_ann in zip(added_imgs, added_anns):
+                gen_dataset.add(img_path=img_path, annotations=img_ann)
 
         ## Augmentation steps
         if augmentation_steps is not None:
-            curr_data = deepcopy(gen_dataset._data["train"])
-            for data in curr_data:
-                img_path = data["image"]
-                img_ann = data["annotations"]
+            for img_path,img_ann in zip(added_imgs, added_anns):
                 
-                img_class, img_ann = read_dataset_annotation(img_ann)
-                if len(img_class) == 0:
-                    img_ann = []
-                else:
-                    ann_with_class = []
-                    for i,nc in enumerate(img_class):
-                        ann_with_class.append([])
-                        ann_with_class[-1].append(nc)
-                        ann_with_class[-1].extend(img_ann[i])
-                    img_ann = ann_with_class
-
                 orig_img = cv2.imread(img_path)
                 base_name = os.path.basename(img_path)
 
