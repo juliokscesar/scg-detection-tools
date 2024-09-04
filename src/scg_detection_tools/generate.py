@@ -60,7 +60,7 @@ def generate_dataset(name: str,
                     shutil.copyfile(src=tmppath, dst=slice_img_path)
 
                     slice_ann = annotation_boxes(det_boxes, sliceimg.shape[1::-1])
-                    gen_dataset.add(img_path=slice_img_path, slice_ann=slice_ann)
+                    gen_dataset.add(img_path=slice_img_path, annotations=slice_ann)
                 
                 detector.detect_objects(img, embed_slice_callback=_save_slice_callback)
             else:
