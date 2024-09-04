@@ -117,7 +117,7 @@ def generate_dataset(name: str,
                 img_ann = data["annotations"]
                 
                 img_class, img_ann = read_dataset_annotation(img_ann)
-                if len(img_class == 0):
+                if len(img_class) == 0:
                     img_ann = []
                 else:
                     ann_with_class = []
