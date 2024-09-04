@@ -22,6 +22,9 @@ class BaseDetectionModel(ABC):
         if model_type not in SUPPORTED_MODEL_TYPES:
             raise Exception(f"model_type {model_type} is not supported. Possible options are: {SUPPORTED_MODEL_TYPES}")
 
+        
+
+
         self._model_type = model_type
         self._model_ckpt_path = model_ckpt_path
         self._underlying_model = underlying_model
@@ -91,6 +94,7 @@ class BaseDetectionModel(ABC):
 class YOLOv8(BaseDetectionModel):
     def __init__(self, yolov8_ckpt_path: str):
         yolo_model = YOLO(yolov8_ckpt_path)
+        self._device = get_opt_device()
         super().__init__(model_type="yolov8", model_ckpt_path=yolov8_ckpt_path, underlying_model=yolo_model)
 
 
@@ -131,27 +135,14 @@ class YOLOv8(BaseDetectionModel):
 
 class YOLO_NAS(BaseDetectionModel):
     def __init__(self, model_arch: str, checkpoint_path: str, classes: list):
-        if torch.cuda.is_availabe():
-            if torch.cuda.device_count() == 1:
-                device = 0
-            else:
-                available_mem = torch.cuda.mem_get_info()
-                highest = available_mem[0]
-                device = 0
-                # choose device with most available memory
-                for i in range(available_mem):
-                    if available_mem[i] > highest:
-                        highest = available_mem[i]
-                        device = i
-        else:
-            device = "cpu"
-
         self._model_arch = model_arch
-        self._device = device
         self._classes = classes.copy()
 
+        self._device = get_opt_device()
+
+
         model = models.get(model_arch, num_classes=len(classes), checkpoint_path=checkpoint_path)
-        model.to(device)
+        model.to(self._device)
 
         super().__init__(model_type="yolonas", model_ckpt_path=checkpoint_path, underlying_model=model)
 
@@ -241,5 +232,25 @@ class RoboflowModel(BaseDetectionModel):
               device: Union[list, str, int] = "cpu", 
               workers=6):
         raise Exception("Roboflow model does not support training")
+
+
+
+def get_opt_device():
+    if torch.cuda.is_availabe():
+        if torch.cuda.device_count() != 1:
+            available_mem = torch.cuda.mem_get_info()
+            highest = available_mem[0]
+            device = 0
+            # choose device with most available memory
+            for i in range(available_mem):
+                if available_mem[i] > highest:
+                    highest = available_mem[i]
+                    device = i
+            torch.cuda.set_device(device)
+        device = "cuda"
+    else:
+        device = "cpu"
+
+    return device
 
 
