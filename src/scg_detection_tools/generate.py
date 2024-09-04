@@ -104,6 +104,8 @@ def generate_dataset(name: str,
     
 
         ######################################################################################
+
+        gen_dataset.save()
     
         if not gen_on_slice:
             gen_dataset.add(img_path=final_img, annotations=final_ann)
