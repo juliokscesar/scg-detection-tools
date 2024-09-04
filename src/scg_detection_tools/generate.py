@@ -22,6 +22,9 @@ class AugmentationSteps(Flag):
     SHARPEN     = auto()
     NOISE       = auto()
 
+    def __str__(self):
+        return str(self.name)
+
 
 def generate_dataset(name: str, 
                      out_dir: str,
