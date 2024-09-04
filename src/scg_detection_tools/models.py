@@ -242,7 +242,7 @@ def get_opt_device():
             highest = available_mem[0]
             device = 0
             # choose device with most available memory
-            for i in range(available_mem):
+            for i in range(len(available_mem)):
                 if available_mem[i] > highest:
                     highest = available_mem[i]
                     device = i
