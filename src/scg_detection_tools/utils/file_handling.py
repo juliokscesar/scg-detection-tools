@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import shutil
 import yaml
 import supervision as sv
@@ -60,11 +61,24 @@ def detections_to_file(out_file: str, detections: sv.Detections = None, boxes = 
         for box in boxes:
             f.write(f"{' '.join([str(int(x)) for x in box])}\n")
 
-def read_detection_boxes_file(file: str) -> np.ndarray:
+def read_detection_boxes_file(file: str) -> list:
     boxes = []
     with open(file, "r") as f:
         for line in f:
             box = [int(x) for x in line.strip().split()]
             boxes.append(box)
     return boxes
+
+def read_cached_detections(img_files: str, path: str) -> list:
+    cache_loc = path
+    cache_files = get_all_files_from_paths(cache_loc, skip_ext=[".png", ".jpeg", ".jpg"])
+    imgboxes = {}
+    for img in img_files:
+        for cache_file in cache_files:
+            # if image is img.png, cache file will be img.png.detections
+            if Path(cache_file).stem == os.path.basename(img):
+                imgboxes[img] = read_detection_boxes_file(cache_file)
+                break
+
+    return imgboxes
 

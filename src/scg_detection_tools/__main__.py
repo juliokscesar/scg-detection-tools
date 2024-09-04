@@ -7,7 +7,9 @@ import warnings
 
 from scg_detection_tools.models import SUPPORTED_MODEL_TYPES
 import scg_detection_tools.models as md
-from scg_detection_tools.utils.file_handling import get_all_files_from_paths, detections_to_file, read_detection_boxes_file
+from scg_detection_tools.utils.file_handling import (
+        get_all_files_from_paths, detections_to_file, read_cached_detections
+)
 from scg_detection_tools.utils.image_tools import (
         box_annotated_image, segment_annotated_image, plot_image, save_image
 )
@@ -292,15 +294,7 @@ def generate(args):
 
     imgboxes = None
     if args.cached_detections:
-        cache_loc = args.cached_detections
-        cache_files = get_all_files_from_paths(cache_loc, skip_ext=[".png", ".jpeg", ".jpg"])
-        imgboxes = {}
-        for img in img_files:
-            for cache_file in cache_files:
-                # if image is img.png, cache file will be img.png.detections
-                if Path(cache_file).stem == os.path.basename(img):
-                    imgboxes[img] = read_detection_boxes_file(cache_file)
-                    break
+        imgboxes = read_cached_detections(args.cached_detections)
 
     aug_steps = None
     if args.augmentations is not None:
