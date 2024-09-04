@@ -103,7 +103,7 @@ class SAM2Segment:
 
     def _segment_detection(self, img_p: Union[str,np.ndarray], detections: sv.Detections):
         boxes = detections.xyxy.astype(np.int32)
-        return _segment_boxes(img_p, boxes)
+        return self._segment_boxes(img_p, boxes)
 
     def _segment_boxes(self, img_p: Union[str,np.ndarray], boxes: np.ndarray):
         if isinstance(img_p, str):
