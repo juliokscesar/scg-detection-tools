@@ -112,6 +112,10 @@ class SAM2Segment:
         else:
             img = img_p
 
+
+        if len(boxes) == 0:
+            return []
+    
         if not isinstance(boxes, np.ndarray):
             boxes = np.array(boxes)
 
@@ -120,6 +124,7 @@ class SAM2Segment:
                                               point_labels=None,
                                               box=boxes,
                                               multimask_output=False)
+
         return masks
 
     def _load_sam2(self, ckpt_path: str, cfg: str, custom_state_dict: str = None):
