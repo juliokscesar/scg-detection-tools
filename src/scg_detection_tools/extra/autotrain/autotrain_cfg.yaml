@@ -1,0 +1,28 @@
+model_path: "/home/julio/Dev/SCG_IFSC/checkpoints/yolonas/large/train2/ckpt_best.pth"
+#model_path: "/home/julio/Dev/SCG_IFSC/checkpoints/yolov8/large/train2/weights/best.pt"
+
+model_type: "yolonas" # yolov8, yolonas
+
+yolonas_arch: "yolo_nas_l"
+
+sam2_ckpt_path: "/home/julio/Dev/SCG_IFSC/checkpoints/sam2/sam2_hiera_tiny.pt"
+sam2_cfg: "sam2_hiera_t.yaml"
+
+
+generate_dataset:
+  data_classes: ["leaf"]
+  data_name: "autotrain_dt"
+  data_dir: "autotrain_dt"
+  use_boxes: True
+  use_segments: False
+  on_slice: False
+  slice_detect: False
+  cached_detections: null
+  augmentation_steps: ["blur", "sharpen", "gray", "noise"]
+
+train:
+  epochs: 5
+  batch: 4
+  device: "cpu"
+  workers: 2
+
