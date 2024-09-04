@@ -117,11 +117,8 @@ def generate_dataset(name: str,
                 img_ann = data["annotations"]
                 
                 img_ann = read_dataset_annotation(img_ann)
-                for i,ann in enumerate(img_ann):
-                    nclass = ann[0]
-                    coords = ann[1:]
-                    img_ann[i] = [nclass].extend(coords)
-
+                print(f"annotations for {img_path} is: {img_ann}")
+                exit()
                 orig_img = cv2.imread(img_path)
                 base_name = os.path.basename(img_path)
 
