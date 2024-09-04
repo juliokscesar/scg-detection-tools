@@ -6,10 +6,12 @@ import shutil
 from typing import Tuple, List
 import numpy as np
 import yaml
+import cv2
 
 from scg_detection_tools.utils.file_handling import(
         get_all_files_from_paths, file_exists, read_yaml
 )
+from scg_detection_tools.utils.image_tools import save_image
 
 DATASET_MODES = ["train", "val", "test"]
 # Manage datasets in YOLOv8 format
@@ -42,11 +44,21 @@ class Dataset:
         if not os.path.isdir(".temp"):
             os.mkdir(".temp")
         
+        # Scale if image is not 640x640
+        img = cv2.imread(img_path)
+        imgh, imgw = img.shape[:2]
+        if imgh != 640 or imgw != 640:
+            img = cv2.resize(img, (640,640))
+            scaled_path = f"scaled_{os.path.basename(img_path)}"
+            save_image(img=img, name=scaled_path, dir=".temp/", cvt_to_bgr=False, notify_save=False)
+            img_path = os.path.join(".temp", scaled_path)
+        
         ann_file = ".temp/" + Path(img_path).stem + ".txt"
         with open(ann_file, "w") as f:
             for ann in annotations:
                 f.write(f"{int(ann[0])} {' '.join([str(float(x)) for x in ann[1:]])}\n")
-    
+
+
         data_img = {"image": img_path, "annotations": ann_file}
         self._data[mode].append(data_img)
 

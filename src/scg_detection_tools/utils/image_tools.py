@@ -30,9 +30,10 @@ def segment_annotated_image(default_img: Union[str,np.ndarray], mask: np.ndarray
         img = cv2.imread(default_img)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
     else:
-        img = default_img
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
-    img[:,:,3] = 255
+        img = default_img.copy()
+        if img.shape[-1] < 4 or img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
+            img[:,:,3] = 255
 
     maskimg = mask_img_alpha(mask=mask.astype(np.uint8), color=color, alpha=alpha)
 
@@ -59,7 +60,7 @@ def plot_image(img: np.ndarray, cvt_to_rgb=True):
     plt.axis("off")
     plt.show()
 
-def save_image(img: np.ndarray, name: str, dir: str = "exp", cvt_to_bgr=False, notify_save=True):
+def save_image(img: np.ndarray, name: str, dir: str = "exp", cvt_to_bgr=False, notify_save=False):
     if cvt_to_bgr:
         if img.shape[:-1] == 4:
             img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
@@ -69,7 +70,7 @@ def save_image(img: np.ndarray, name: str, dir: str = "exp", cvt_to_bgr=False, n
     if not os.path.isdir(dir):
         os.makedirs(dir, exist_ok=True)
 
-    out_file = f"{dir}/{name}"
+    out_file = os.path.join(dir, name)
     cv2.imwrite(out_file, img)
     
     if notify_save:

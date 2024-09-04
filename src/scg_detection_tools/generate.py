@@ -1,11 +1,27 @@
 from typing import List
 import shutil
 import cv2
+import scipy
+import numpy as np
+import random
+from enum import Flag, auto
+import os
 
 from scg_detection_tools.models import BaseDetectionModel
 from scg_detection_tools.detect import Detector
-from scg_detection_tools.dataset import Dataset
+from scg_detection_tools.dataset import Dataset, read_dataset_annotation
 import scg_detection_tools.utils.cvt as cvt
+from scg_detection_tools.utils.image_tools import save_image
+
+
+class AugmentationSteps(Flag):
+    BLUR        = auto()
+    GRAY        = auto()
+    FLIP        = auto()
+    ROTATE      = auto()
+    SHARPEN     = auto()
+    NOISE       = auto()
+
 
 def generate_dataset(name: str, 
                      out_dir: str,
@@ -18,7 +34,8 @@ def generate_dataset(name: str,
                      use_segments=False,
                      gen_on_slice=False,
                      slice_detect=False,
-                     imgboxes_for_segments: dict = None):
+                     imgboxes_for_segments: dict = None,
+                     augmentation_steps: AugmentationSteps = None):
     if (not use_boxes) and (not use_segments):
         raise ValueError("generate_dataset require either use_boxes or use_segments to be true")
 
@@ -29,6 +46,8 @@ def generate_dataset(name: str,
         # keep track of current amount of images to correctly name images
         curr_data_len = len(gen_dataset.get_data(mode="train"))
 
+        final_img = None
+        final_ann = None
         ######################################################################################
 
         if use_boxes:
@@ -38,11 +57,15 @@ def generate_dataset(name: str,
                     shutil.copyfile(src=tmppath, dst=slice_img_path)
 
                     slice_ann = annotation_boxes(det_boxes, sliceimg.shape[1::-1])
-                    gen_dataset.add(img_path=slice_img_path, annotations=slice_ann)
+                    final_img = slice_img_path
+                    final_ann = slice_ann
+
             else:
                 detections = detector.detect_objects(img)[0]
                 img_ann = annotation_boxes(detections.xyxy, imgsz=cv2.imread(img).shape[1::-1])
-                gen_dataset.add(img_path=img, annotations=img_ann)
+                final_img = img
+                final_ann = img_ann
+
 
         ######################################################################################
 
@@ -62,7 +85,9 @@ def generate_dataset(name: str,
                     tmp_path = slice["path"]
                     slice_path = f".temp/slice_seg{curr_data_len}_{os.path.basename(img)}"
                     slice_ann = annotation_contours(slice["contours"], imgsz=(640,640))
-                    gen_dataset.add(img_path=slice_path, annotations=slice_ann)
+
+                    final_img = slice_path
+                    final_ann = slice_ann
             else:
                 if imgboxes_for_segments is not None:
                     masks = seg._segment_boxes(img_p=img, boxes=imgboxes_for_segments[img])
@@ -71,12 +96,72 @@ def generate_dataset(name: str,
                     _, contours = seg.detect_segment(img, use_slice_detection=slice_detect)
 
                 img_ann = annotation_contours(contours, imgsz=cv2.imread(img).shape[1::-1])
-                gen_dataset.add(img_path=img, annotations=img_ann)
+
+                final_img = img
+                final_ann = img_ann
     
+
         ######################################################################################
         
-        # save after processing each image
+        gen_dataset.add(img_path=final_img, annotations=final_ann)
+
+        ## Augmentation steps
+        if augmentation_steps is not None:
+            orig_img = cv2.imread(final_img)
+            base_name = os.path.basename(final_img)
+
+            if AugmentationSteps.BLUR in augmentation_steps:
+                sigma = random.randrange(3, 11+1, 2)
+                blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
+                path = f"blur_{base_name}"
+                save_image(blurred, name=path, dir=".temp")
+                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+            
+            if AugmentationSteps.GRAY in augmentation_steps:
+                gray = cv2.cvtColor(orig_img, cv2.COLOR_BGR2GRAY)
+                path = f"gray_{base_name}"
+                save_image(gray, name=path, dir=".temp")
+                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+
+            if AugmentationSteps.FLIP in augmentation_steps:
+                raise NotImplemented()
+                # TODO: make transformations in annotations too
+                flip = np.flipud(orig_img)
+                path = f"flip_{base_name}"
+                save_image(flip, name=path, dir=".temp")
+                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+            
+            if AugmentationSteps.ROTATE in augmentation_steps:
+                raise NotImplemented()
+                # TODO: make transformations in annotations too
+                ang = random.randint(30, 270+1)
+                rot = scipy.ndimage.rotate(orig_img, ang, reshape=False)
+                path = f"rotate_{base_name}"
+                save_image(rot, name=path, dir=".temp")
+                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+
+
+            if AugmentationSteps.SHARPEN in augmentation_steps:
+                sigma = random.randrange(3, 7+1, 2)
+                blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
+                sharpened = cv2.addWeighted(blurred, 7.5, orig_img, -6.3, 0)
+                path = f"sharpen_{base_name}"
+                save_image(sharpened, name=path, dir=".temp")
+                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+
+            
+            if AugmentationSteps.NOISE in augmentation_steps:
+                rng = np.random.default_rng()
+                noise = rng.normal(0, 0.6, orig_img.shape).astype(np.uint8)
+                noisy = cv2.add(orig_img, noise)
+                path = f"noise_{base_name}"
+                save_image(noisy, name=path, dir=".temp")
+                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+
         gen_dataset.save()
+
+        ################################### END OF IMGS LOOP #################################
+
     
     return gen_dataset
             
@@ -96,4 +181,5 @@ def annotation_contours(contours, imgsz):
         ann.append([0])
         ann[-1].extend(contour)
     return ann
+
 

@@ -273,10 +273,9 @@ def segment(args):
             save_image(annotated, name=f"seg{os.path.basename(img)}", dir="out")
 
 def generate(args):
-    from scg_detection_tools.generate import generate_dataset
+    from scg_detection_tools.generate import generate_dataset, AugmentationSteps
 
     img_files = get_all_files_from_paths(*args.img_source, skip_ext=[".txt", ".detections", ".json"])
-    
 
     model_t = args.model_type
     if model_t == "yolov8":
@@ -297,19 +296,22 @@ def generate(args):
                 if Path(cache_file).stem == os.path.basename(img):
                     imgboxes[img] = read_detection_boxes_file(cache_file)
                     break
+
+    aug_steps = AugmentationSteps.BLUR | AugmentationSteps.SHARPEN | AugmentationSteps.GRAY | AugmentationSteps.NOISE
     
     gen_dataset = generate_dataset(name="gen_dataset",
                                    out_dir="gen_out",
                                    img_files=img_files,
                                    classes=args.data_classes,
                                    model=model,
-                                   sam2_ckpt_path=args.sam2_ckpt_path,
+                                   sam2_ckpt_path=args.sam2_ckpt,
                                    sam2_cfg=args.sam2_cfg,
                                    use_boxes=args.boxes,
                                    use_segments=args.segments,
                                    gen_on_slice=args.on_slice,
                                    slice_detect=args.slice_detect,
-                                   imgboxes_for_segments=imgboxes)
+                                   imgboxes_for_segments=imgboxes,
+                                   augmentation_steps=aug_steps)
 
     print("FINISHED GENERATING DATASET", gen_dataset._name)
 
