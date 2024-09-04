@@ -61,7 +61,8 @@ def generate_dataset(name: str,
 
                     slice_ann = annotation_boxes(det_boxes, sliceimg.shape[1::-1])
                     gen_dataset.add(img_path=slice_img_path, slice_ann=slice_ann)
-
+                
+                detector.detect_objects(img, embed_slice_callback=_save_slice_callback)
             else:
                 detections = detector.detect_objects(img)[0]
                 img_ann = annotation_boxes(detections.xyxy, imgsz=cv2.imread(img).shape[1::-1])
