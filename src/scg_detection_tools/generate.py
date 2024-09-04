@@ -6,6 +6,7 @@ import numpy as np
 import random
 from enum import Flag, auto
 import os
+from copy import deepcopy
 
 from scg_detection_tools.models import BaseDetectionModel
 from scg_detection_tools.detect import Detector
@@ -112,7 +113,8 @@ def generate_dataset(name: str,
 
         ## Augmentation steps
         if augmentation_steps is not None:
-            for data in gen_dataset._data["train"]:
+            curr_data = deepcopy(gen_dataset._data["train"])
+            for data in curr_data:
                 img_path = data["image"]
                 img_ann = data["annotations"]
                 
@@ -130,18 +132,19 @@ def generate_dataset(name: str,
                 orig_img = cv2.imread(img_path)
                 base_name = os.path.basename(img_path)
 
+                augmented = []
+
                 if AugmentationSteps.BLUR in augmentation_steps:
                     sigma = random.randrange(3, 11+1, 2)
                     blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
                     path = f"blur_{base_name}"
-                    save_image(blurred, name=path, dir=".temp")
-                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
                 
                 if AugmentationSteps.GRAY in augmentation_steps:
                     gray = cv2.cvtColor(orig_img, cv2.COLOR_BGR2GRAY)
                     path = f"gray_{base_name}"
                     save_image(gray, name=path, dir=".temp")
-                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
 
                 if AugmentationSteps.FLIP in augmentation_steps:
                     raise NotImplemented()
@@ -149,7 +152,7 @@ def generate_dataset(name: str,
                     flip = np.flipud(orig_img)
                     path = f"flip_{base_name}"
                     save_image(flip, name=path, dir=".temp")
-                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
                 
                 if AugmentationSteps.ROTATE in augmentation_steps:
                     raise NotImplemented()
@@ -158,7 +161,7 @@ def generate_dataset(name: str,
                     rot = scipy.ndimage.rotate(orig_img, ang, reshape=False)
                     path = f"rotate_{base_name}"
                     save_image(rot, name=path, dir=".temp")
-                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
 
 
                 if AugmentationSteps.SHARPEN in augmentation_steps:
@@ -167,7 +170,7 @@ def generate_dataset(name: str,
                     sharpened = cv2.addWeighted(blurred, 7.5, orig_img, -6.3, 0)
                     path = f"sharpen_{base_name}"
                     save_image(sharpened, name=path, dir=".temp")
-                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
 
                 
                 if AugmentationSteps.NOISE in augmentation_steps:
@@ -176,7 +179,10 @@ def generate_dataset(name: str,
                     noisy = cv2.add(orig_img, noise)
                     path = f"noise_{base_name}"
                     save_image(noisy, name=path, dir=".temp")
-                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
+
+                for aug in augmented:
+                    gen_dataset.add(img_path=aug["path"], annotations=aug["annotations"])
 
         gen_dataset.save()
 
