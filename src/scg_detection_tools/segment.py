@@ -118,7 +118,7 @@ class SAM2Segment:
         self._predictor.set_image(img)
         masks, _, _ = self._predictor.predict(point_coords=None,
                                               point_labels=None,
-                                              box=boxes[None,:],
+                                              box=boxes,
                                               multimask_output=False)
         return masks
 
