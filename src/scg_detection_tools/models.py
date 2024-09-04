@@ -236,7 +236,7 @@ class RoboflowModel(BaseDetectionModel):
 
 
 def get_opt_device():
-    if torch.cuda.is_availabe():
+    if torch.cuda.is_available():
         if torch.cuda.device_count() != 1:
             available_mem = torch.cuda.mem_get_info()
             highest = available_mem[0]
