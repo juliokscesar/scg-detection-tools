@@ -3,7 +3,7 @@ from pathlib import Path
 import os
 
 from scg_detection_tools.utils.file_handling import (
-        read_yaml, get_all_files_from_paths, read_detection_boxes_file
+        read_yaml, get_all_files_from_paths, read_detection_boxes_file, clear_temp_folder
 )
 from scg_detection_tools.generate import generate_dataset, AugmentationSteps
 from scg_detection_tools.models import YOLOv8, YOLO_NAS
@@ -84,6 +84,8 @@ def main():
                                device=train_cfg["device"],
                                workers=train_cfg["workers"])
 
+
+    clear_temp_folder()
 
 if __name__ == "__main__":
     main()
