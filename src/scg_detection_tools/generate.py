@@ -60,8 +60,7 @@ def generate_dataset(name: str,
                     shutil.copyfile(src=tmppath, dst=slice_img_path)
 
                     slice_ann = annotation_boxes(det_boxes, sliceimg.shape[1::-1])
-                    final_img = slice_img_path
-                    final_ann = slice_ann
+                    gen_dataset.add(img_path=slice_img_path, slice_ann=slice_ann)
 
             else:
                 detections = detector.detect_objects(img)[0]
@@ -89,8 +88,7 @@ def generate_dataset(name: str,
                     slice_path = f".temp/slice_seg{curr_data_len}_{os.path.basename(img)}"
                     slice_ann = annotation_contours(slice["contours"], imgsz=(640,640))
 
-                    final_img = slice_path
-                    final_ann = slice_ann
+                    gen_dataset.add(img_path=slice_path, annotations=slice_ann)
             else:
                 if imgboxes_for_segments is not None:
                     masks = seg._segment_boxes(img_p=img, boxes=imgboxes_for_segments[img])
@@ -105,61 +103,72 @@ def generate_dataset(name: str,
     
 
         ######################################################################################
-        
-        gen_dataset.add(img_path=final_img, annotations=final_ann)
+    
+        if not gen_on_slice:
+            gen_dataset.add(img_path=final_img, annotations=final_ann)
 
         ## Augmentation steps
         if augmentation_steps is not None:
-            orig_img = cv2.imread(final_img)
-            base_name = os.path.basename(final_img)
+            for data in gen_dataset._data["train"]:
+                img_path = data["image"]
+                img_ann = data["annotations"]
+                
+                img_ann = read_dataset_annotation(img_ann)
+                for i,ann in enumerate(img_ann):
+                    nclass = ann[0]
+                    coords = ann[1:]
+                    img_ann[i] = [nclass].extend(coords)
 
-            if AugmentationSteps.BLUR in augmentation_steps:
-                sigma = random.randrange(3, 11+1, 2)
-                blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
-                path = f"blur_{base_name}"
-                save_image(blurred, name=path, dir=".temp")
-                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
-            
-            if AugmentationSteps.GRAY in augmentation_steps:
-                gray = cv2.cvtColor(orig_img, cv2.COLOR_BGR2GRAY)
-                path = f"gray_{base_name}"
-                save_image(gray, name=path, dir=".temp")
-                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+                orig_img = cv2.imread(img_path)
+                base_name = os.path.basename(img_path)
 
-            if AugmentationSteps.FLIP in augmentation_steps:
-                raise NotImplemented()
-                # TODO: make transformations in annotations too
-                flip = np.flipud(orig_img)
-                path = f"flip_{base_name}"
-                save_image(flip, name=path, dir=".temp")
-                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
-            
-            if AugmentationSteps.ROTATE in augmentation_steps:
-                raise NotImplemented()
-                # TODO: make transformations in annotations too
-                ang = random.randint(30, 270+1)
-                rot = scipy.ndimage.rotate(orig_img, ang, reshape=False)
-                path = f"rotate_{base_name}"
-                save_image(rot, name=path, dir=".temp")
-                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+                if AugmentationSteps.BLUR in augmentation_steps:
+                    sigma = random.randrange(3, 11+1, 2)
+                    blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
+                    path = f"blur_{base_name}"
+                    save_image(blurred, name=path, dir=".temp")
+                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+                
+                if AugmentationSteps.GRAY in augmentation_steps:
+                    gray = cv2.cvtColor(orig_img, cv2.COLOR_BGR2GRAY)
+                    path = f"gray_{base_name}"
+                    save_image(gray, name=path, dir=".temp")
+                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+
+                if AugmentationSteps.FLIP in augmentation_steps:
+                    raise NotImplemented()
+                    # TODO: make transformations in annotations too
+                    flip = np.flipud(orig_img)
+                    path = f"flip_{base_name}"
+                    save_image(flip, name=path, dir=".temp")
+                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
+                
+                if AugmentationSteps.ROTATE in augmentation_steps:
+                    raise NotImplemented()
+                    # TODO: make transformations in annotations too
+                    ang = random.randint(30, 270+1)
+                    rot = scipy.ndimage.rotate(orig_img, ang, reshape=False)
+                    path = f"rotate_{base_name}"
+                    save_image(rot, name=path, dir=".temp")
+                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
 
 
-            if AugmentationSteps.SHARPEN in augmentation_steps:
-                sigma = random.randrange(3, 7+1, 2)
-                blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
-                sharpened = cv2.addWeighted(blurred, 7.5, orig_img, -6.3, 0)
-                path = f"sharpen_{base_name}"
-                save_image(sharpened, name=path, dir=".temp")
-                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+                if AugmentationSteps.SHARPEN in augmentation_steps:
+                    sigma = random.randrange(3, 7+1, 2)
+                    blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
+                    sharpened = cv2.addWeighted(blurred, 7.5, orig_img, -6.3, 0)
+                    path = f"sharpen_{base_name}"
+                    save_image(sharpened, name=path, dir=".temp")
+                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
 
-            
-            if AugmentationSteps.NOISE in augmentation_steps:
-                rng = np.random.default_rng()
-                noise = rng.normal(0, 0.6, orig_img.shape).astype(np.uint8)
-                noisy = cv2.add(orig_img, noise)
-                path = f"noise_{base_name}"
-                save_image(noisy, name=path, dir=".temp")
-                gen_dataset.add(img_path=os.path.join(".temp", path), annotations=final_ann)
+                
+                if AugmentationSteps.NOISE in augmentation_steps:
+                    rng = np.random.default_rng()
+                    noise = rng.normal(0, 0.6, orig_img.shape).astype(np.uint8)
+                    noisy = cv2.add(orig_img, noise)
+                    path = f"noise_{base_name}"
+                    save_image(noisy, name=path, dir=".temp")
+                    gen_dataset.add(img_path=os.path.join(".temp", path), annotations=img_ann)
 
         gen_dataset.save()
 
