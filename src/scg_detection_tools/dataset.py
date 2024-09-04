@@ -7,6 +7,7 @@ from typing import Tuple, List
 import numpy as np
 import yaml
 import cv2
+import warnings
 
 from scg_detection_tools.utils.file_handling import(
         get_all_files_from_paths, file_exists, read_yaml
@@ -46,6 +47,9 @@ class Dataset:
         
         # Scale if image is not 640x640
         img = cv2.imread(img_path)
+        if img is None:
+            warnings.warn(f"Coudn't load image {img_path} to check for it's size. Skipping it")
+            return
         imgh, imgw = img.shape[:2]
         if imgh != 640 or imgw != 640:
             img = cv2.resize(img, (640,640))
