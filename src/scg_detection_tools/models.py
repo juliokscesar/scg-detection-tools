@@ -131,7 +131,21 @@ class YOLOv8(BaseDetectionModel):
 
 class YOLO_NAS(BaseDetectionModel):
     def __init__(self, model_arch: str, checkpoint_path: str, classes: list):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_availabe():
+            if torch.cuda.device_count() == 1:
+                device = 0
+            else:
+                available_mem = torch.cuda.mem_get_info()
+                highest = available_mem[0]
+                device = 0
+                # choose device with most available memory
+                for i in range(available_mem):
+                    if available_mem[i] > highest:
+                        highest = available_mem[i]
+                        device = i
+        else:
+            device = "cpu"
+
         self._model_arch = model_arch
         self._device = device
         self._classes = classes.copy()
