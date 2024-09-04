@@ -55,7 +55,7 @@ def generate_dataset(name: str,
 
         if use_boxes:
             if gen_on_slice:
-                def _save_slice_callback(img_path, slceimg, tmppath, det_boxes):
+                def _save_slice_callback(img_path, sliceimg, tmppath, det_boxes):
                     slice_img_path = f".temp/slice_det{curr_data_len}_{os.path.basename(img_path)}"
                     shutil.copyfile(src=tmppath, dst=slice_img_path)
 
