@@ -167,6 +167,11 @@ dest="slice",
                             type=str,
                             default=None,
                             help="Use cached detections (boxes coordinates written to a file)")
+    gen_parser.add_argument("--augmentations",
+                            nargs="+",
+                            type=str,
+                            choices=["blur", "gray", "noise", "sharpen"],
+                            help="Augmentation steps after processing image")
 
 
     return parser.parse_args()
@@ -297,7 +302,12 @@ def generate(args):
                     imgboxes[img] = read_detection_boxes_file(cache_file)
                     break
 
-    aug_steps = AugmentationSteps.BLUR | AugmentationSteps.SHARPEN | AugmentationSteps.GRAY | AugmentationSteps.NOISE
+    aug_steps = None
+    if args.augmentations is not None:
+        aug_steps = AugmentationSteps(0)
+        for aug in AugmentationSteps:
+            if str(aug).lower() in args.augmentations:
+                aug_steps |= aug
     
     gen_dataset = generate_dataset(name="gen_dataset",
                                    out_dir="gen_out",

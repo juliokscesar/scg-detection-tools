@@ -16,6 +16,7 @@ from scg_detection_tools.utils.image_tools import save_image
 
 
 class AugmentationSteps(Flag):
+    NONE        = auto()
     BLUR        = auto()
     GRAY        = auto()
     FLIP        = auto()
