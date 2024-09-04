@@ -131,6 +131,7 @@ def generate_dataset(name: str,
                     sigma = random.randrange(3, 11+1, 2)
                     blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
                     path = f"blur_{base_name}"
+                    save_image(blurred, name=path, dir=".temp")
                     augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
                 
                 if AugmentationSteps.GRAY in augmentation_steps:
