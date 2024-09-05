@@ -22,9 +22,6 @@ class BaseDetectionModel(ABC):
         if model_type not in SUPPORTED_MODEL_TYPES:
             raise Exception(f"model_type {model_type} is not supported. Possible options are: {SUPPORTED_MODEL_TYPES}")
 
-        
-
-
         self._model_type = model_type
         self._model_ckpt_path = model_ckpt_path
         self._underlying_model = underlying_model
@@ -234,23 +231,6 @@ class RoboflowModel(BaseDetectionModel):
         raise Exception("Roboflow model does not support training")
 
 
-
 def get_opt_device():
-    if torch.cuda.is_available():
-        if torch.cuda.device_count() != 1:
-            available_mem = torch.cuda.mem_get_info()
-            highest = available_mem[0]
-            device = 0
-            # choose device with most available memory
-            for i in range(len(available_mem)):
-                if available_mem[i] > highest:
-                    highest = available_mem[i]
-                    device = i
-            torch.cuda.set_device(device)
-        device = "cuda"
-    else:
-        device = "cpu"
-
-    return device
-
+    return "cuda" if torch.cuda.is_available() else "cpu"
 
