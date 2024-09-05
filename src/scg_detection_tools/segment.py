@@ -5,7 +5,7 @@ import sam2
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 import supervision as sv
-from typing import Union
+from typing import Union, Tuple
 import threading
 import queue
 
@@ -51,7 +51,7 @@ class SAM2Segment:
         return masks, self._sam2masks_to_contours(masks)
 
 
-    def slice_segment_detect(self, img_path: str, slice_wh: tuple):
+    def slice_segment_detect(self, img_path: str, slice_wh: Tuple[int,int], embed_slice_callback=None):
         result = {
             "original_image": img_path,
             "detections": None,
@@ -75,6 +75,9 @@ class SAM2Segment:
             contours = self._sam2masks_to_contours(masks)
             slice_buffer["masks"] = masks
             slice_buffer["contours"] = contours
+
+            if embed_slice_callback is not None:
+                embed_slice_callback(img_path, slice, slice_path, slice_boxes, masks, contours)
 
             result["slices"].append(slice_buffer)
 
@@ -101,9 +104,11 @@ class SAM2Segment:
             
         return masks
 
+
     def _segment_detection(self, img_p: Union[str,np.ndarray], detections: sv.Detections):
         boxes = detections.xyxy.astype(np.int32)
         return self._segment_boxes(img_p, boxes)
+
 
     def _segment_boxes(self, img_p: Union[str,np.ndarray], boxes: np.ndarray):
         if isinstance(img_p, str):
