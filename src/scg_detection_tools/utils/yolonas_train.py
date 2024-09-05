@@ -83,7 +83,7 @@ def train_yolo_nas(dataset_dir: str,
                            checkpoint_path=pretrained_checkpoint_path).to(device)
 
     train_params = {
-        "average_best_models":True,
+        "average_best_models": False,
         "warmup_mode": "linear_epoch_step",
         "warmup_initial_lr": 1e-6,
         "lr_warmup_epochs": 3,
