@@ -3,8 +3,21 @@ from typing import Tuple
 import cv2
 import numbers
 
-def segment_to_box(seg_contour: np.ndarray):
-    pass
+def segment_to_box(seg_contour: np.ndarray, normalized=False, imgsz: Tuple[int,int]=None):
+    if normalized and imgsz is None:
+        raise ValueError("For normalized contours, imgsz argument is required")
+
+    x1, y1 = np.min(seg_contour, axis=0)
+    x2, y2 = np.max(seg_contour, axis=1)
+    
+    h, w = imgsz
+    if normalized:
+        x1 *= w
+        x2 *= w
+        y1 *= h
+        y2 *= h
+
+    return np.array([x1, y1, x2, y2])
 
 
 # Convert every contour in contours to masks images of size imgsz
@@ -12,7 +25,7 @@ def segment_to_box(seg_contour: np.ndarray):
 # is white
 # Each contour in 'contours' contains N points that describes the contour
 # but FLATTENED: countour = x0, y0, x1, y1, ..., xn, yn
-def contours_to_masks(contours: list, imgsz: Tuple[int], normalized=True):
+def contours_to_masks(contours: list, imgsz: Tuple[int, int], normalized=True):
     masks = []
 
     for contour in contours:
