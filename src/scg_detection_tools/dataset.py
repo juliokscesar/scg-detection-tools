@@ -165,7 +165,7 @@ class Dataset:
 
 
 
-def read_dataset_annotation(ann_file: str, separate_class=True) -> Tuple[int, list]:
+def read_dataset_annotation(ann_file: str, separate_class=True):
     if not file_exists(ann_file):
         raise FileExistsError(f"File {ann_file} doesn't exist")
     

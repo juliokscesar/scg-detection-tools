@@ -97,7 +97,6 @@ def crop_box_image(img: Union[np.ndarray, str],
     if isinstance(img, str):
         img = cv2.imread(img)
 
-    print(f"DEBUG image_tools.py: box={box_xyxy}")
     row0, col0, row1, col1 = box_xyxy
     return img[col0:(col1+1), row0:(row1+1)]
 
