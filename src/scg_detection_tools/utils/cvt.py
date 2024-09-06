@@ -8,7 +8,7 @@ def segment_to_box(seg_contour: np.ndarray, normalized=False, imgsz: Tuple[int,i
         raise ValueError("For normalized contours, imgsz argument is required")
 
     x1, y1 = np.min(seg_contour, axis=0)
-    x2, y2 = np.max(seg_contour, axis=1)
+    x2, y2 = np.max(seg_contour, axis=0)
     
     h, w = imgsz
     if normalized:
