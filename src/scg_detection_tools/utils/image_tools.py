@@ -7,7 +7,10 @@ import os
 
 from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 
-def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float) -> np.ndarray:
+def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mask=True) -> np.ndarray:
+    if not binary_mask:
+        mask = np.where(mask == 255, 1, 0)
+    
     mask_img = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
     color_img = np.full_like(mask_img, color, dtype=np.uint8)
     alpha_channel = (mask * alpha * 255).astype(np.uint8)
