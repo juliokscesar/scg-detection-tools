@@ -17,7 +17,7 @@ def segment_to_box(seg_contour: np.ndarray, normalized=False, imgsz: Tuple[int,i
         y1 *= h
         y2 *= h
 
-    return np.array([x1, y1, x2, y2])
+    return np.array([x1, y1, x2, y2]).astype(np.int32)
 
 
 # Convert every contour in contours to masks images of size imgsz
