@@ -91,7 +91,7 @@ class SAM2Segment:
 
     def _segment_point(self, img_p: Union[str, np.ndarray], input_points: np.ndarray, input_labels: np.ndarray):
         if isinstance(img_p, str):
-            img = cv2.imread(img_path)
+            img = cv2.imread(img_p)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         else:
             img = img_p
@@ -164,14 +164,16 @@ class SAM2Segment:
                     fmt_contours[-1].append(points[0])
         mask_contours = fmt_contours
 
-        discard = []
         for i in range(len(mask_contours)):
+            # since we're changing the mask_contours list on the fly
+            # it's important to check if we're not indexing out of range
+            if i >= len(mask_contours):
+                break
+
             # Discard any contours with 4 or less points
             # since it's very possible that it's just a mistake (creating boxes as seen in segmentations annotations)
             if len(mask_contours[i]) <= 4:
-                discard.append(i)
-        for i in discard:
-            mask_contours.pop(i)
+                mask_contours.pop(i)
 
         return mask_contours
 
