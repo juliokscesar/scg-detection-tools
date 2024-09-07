@@ -95,6 +95,7 @@ def generate_dataset(name: str,
                 for slice in seg_results["slices"]:
                     tmp_path = slice["path"]
                     slice_path = f".temp/slice_seg{curr_data_len}_{os.path.basename(img)}"
+                    curr_data_len += 1
                     shutil.copy(src=tmp_path, dst=slice_path)
                     slice_ann = annotation_contours(slice["contours"], imgsz=(640,640))
 
