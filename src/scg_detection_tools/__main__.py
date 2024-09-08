@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 import cv2
 import warnings
+import torch
 
 from scg_detection_tools.models import SUPPORTED_MODEL_TYPES
 import scg_detection_tools.models as md
@@ -59,7 +60,7 @@ dest="slice",
                             default=640,
                             help="Slice height when using slice detection. Default is 640")
     det_parser.add_argument("--slice-overlap", 
-                            type=float, 
+type=float, 
                             dest="slice_overlap", 
                             default=10.0,
                             help="Slice overlap ratio when using slice detection. Default is 10.0")
@@ -174,6 +175,18 @@ dest="slice",
                             type=str,
                             choices=["blur", "gray", "noise", "sharpen"],
                             help="Augmentation steps after processing image")
+
+
+    train_parser = subparser.add_parser("train", help="Train YOLOv8 or YOLO-NAS on custom dataset")
+    train_parser.add_argument("model_type", choices=["yolov8", "yolonas"], help="Type of model to train")
+    train_parser.add_argument("model_path", type=str, help="Path to pre-trained model checkpoint")
+    train_parser.add_argument("dataset_dir", type=str, help="Path to dataset directory")
+
+    train_parser.add_argument("--epochs", type=int, default=10, help="Epochs to train. Default is 10")
+    train_parser.add_argument("--batch", type=int, default=4, help="Data batch size. Default is 4")
+    train_parser.add_argument("--workers", type=int, default=2, help="Workers to do training. Default is 2")
+    train_parser.add_argument("--device", nargs="+", help="Device to train on. Can be 'cpu', 0 to use first CUDA device, 1 for second, 0,1 for both, etc")
+
 
 
     return parser.parse_args()
@@ -320,6 +333,36 @@ def generate(args):
     print("FINISHED GENERATING DATASET", gen_dataset._name)
 
 
+def train(args):
+    model_t = args.model_type.strip().lower()
+
+    if model_t == "yolov8":
+        model = md.YOLOv8(yolov8_ckpt_path=args.model_path)
+    elif model_t == "yolonas":
+        YN_ARCH = "yolo_nas_l"
+        YN_CLASSES = ["leaf"]
+        model = md.YOLO_NAS(YN_ARCH, args.model_path, YN_CLASSES)
+    else:
+        raise ValueError(f"Model type {model_t} not supported for training")
+
+    device = args.device
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        if "cpu" in device:
+            device = "cpu"
+        else:
+            device = [int(d) for d in device]
+
+
+    dataset_dir = os.path.abspath(args.dataset_dir)
+    model.train(dataset_dir=dataset_dir,
+                epochs=args.epochs,
+                batch=args.batch,
+                device=device,
+                workers=args.workers)
+
+
 def main():
     args = parse_args()
     command = args.command
@@ -328,6 +371,7 @@ def main():
             "detect": detect,
             "segment": segment,
             "generate": generate,
+            "train": train,
     }
 
     if command is None:
