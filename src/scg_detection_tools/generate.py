@@ -207,3 +207,27 @@ def annotation_contours(contours, imgsz):
     return ann
 
 
+def seg_to_box_dataset(dataset_dir: str):
+    dt = Dataset(name=os.path.basename(dataset_dir), dataset_dir=dataset_dir)
+    dt.load()
+    
+    boxdt = Dataset(name=f"{dt._name}_box", dataset_dir=f"{dt.directory}_box")
+
+    modes = ["train", "val", "test"]
+    for mode in modes:
+        for data in dt.get_data(mode=mode):
+            imgsz = cv2.imread(data["image"]).shape[:2]
+            ann = read_dataset_annotation(data["annotations"], separate_class=False)
+            for i in range(len(ann)):
+                points = np.array(ann[i][1:])
+                points = points.reshape(len(points)//2, 2)
+                box = cvt.segment_to_box(points, normalized=True, imgsz=imgsz)
+                fmt_box = cvt.detbox_to_yolo_fmt([box], imgsz)[0]
+                new_ann = [ann[i][0]]
+                new_ann.extend(fmt_box)
+                ann[i] = new_ann
+
+            boxdt.add(data["image"], ann, mode=mode)
+
+    boxdt.save()
+

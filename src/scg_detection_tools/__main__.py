@@ -152,6 +152,7 @@ type=float,
     gen_annotations = gen_parser.add_mutually_exclusive_group(required=True)
     gen_annotations.add_argument("--boxes", action="store_true", help="Save YOLO detection boxes annotations")
     gen_annotations.add_argument("--segments", action="store_true", help="Save SAM2 segments annotations")
+    gen_annotations.add_argument("--convert", action="store_true", help="Just convert a instance segmentation dataset to object detection boxes")
     
     gen_parser.add_argument("--on-slice",
                             dest="on_slice",
@@ -177,7 +178,7 @@ type=float,
                             help="Augmentation steps after processing image")
 
 
-    train_parser = subparser.add_parser("train", help="Train YOLOv8 or YOLO-NAS on custom dataset")
+    train_parser = subparsers.add_parser("train", help="Train YOLOv8 or YOLO-NAS on custom dataset")
     train_parser.add_argument("model_type", choices=["yolov8", "yolonas"], help="Type of model to train")
     train_parser.add_argument("model_path", type=str, help="Path to pre-trained model checkpoint")
     train_parser.add_argument("dataset_dir", type=str, help="Path to dataset directory")
@@ -293,7 +294,13 @@ def segment(args):
             save_image(annotated, name=f"seg{os.path.basename(img)}", dir="out")
 
 def generate(args):
-    from scg_detection_tools.generate import generate_dataset, AugmentationSteps
+    from scg_detection_tools.generate import generate_dataset, AugmentationSteps, seg_to_box_dataset
+
+    if args.convert:
+        dataset_dir = args.img_source[0]
+        seg_to_box_dataset(dataset_dir)
+        return
+
 
     img_files = get_all_files_from_paths(*args.img_source, skip_ext=[".txt", ".detections", ".json"])
 

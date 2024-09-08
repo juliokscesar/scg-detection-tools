@@ -170,7 +170,7 @@ def read_dataset_annotation(ann_file: str, separate_class=True):
         raise FileExistsError(f"File {ann_file} doesn't exist")
     
     annotations = []
-    with open(ann_file, "r") as f:
+    with open(ann_file, "r", encoding="utf-8") as f:
         for line in f:
             data = line.split()
             annotations.append([])
