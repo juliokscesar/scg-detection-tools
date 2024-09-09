@@ -10,15 +10,21 @@ from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mask=True) -> np.ndarray:
     if not binary_mask:
         mask = np.where(mask == 255, 1, 0)
+    mask = mask.astype(np.uint8)
     
-    mask_img = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
-    color_img = np.full_like(mask_img, color, dtype=np.uint8)
-    alpha_channel = (mask * alpha * 255).astype(np.uint8)
-    color_with_alpha = cv2.merge([color_img[:,:,0],
-                                  color_img[:,:,1],
-                                  color_img[:,:,2],
-                                  alpha_channel])
-    return color_with_alpha
+    mask_img = mask * np.concatenate((color, [alpha])).reshape(1,1,-1)
+
+    # mask_img = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
+    # color_img = np.full_like(mask_img, color, dtype=np.uint8)
+    # alpha_channel = (mask * alpha * 255).astype(np.uint8)
+    # color_with_alpha = cv2.merge([color_img[:,:,0],
+    #                               color_img[:,:,1],
+    #                               color_img[:,:,2],
+    #                               alpha_channel])
+
+
+
+    return mask_img
 
 def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thickness: int = 1) -> np.ndarray:
     box_annotator = sv.BoxAnnotator(thickness=box_thickness)
