@@ -67,11 +67,14 @@ class SAM2Segment:
             if len(slice_boxes) == 0:
                 return
 
-            self._predictor.set_image(slice)
-            masks, _, _ = self._predictor.predict(point_coords=None,
-                                                  point_labels=None,
-                                                  box=slice_boxes[None, :],
-                                                  multimask_output=False)
+            with torch.no_grad():
+                self._predictor.set_image(slice)
+                masks, _, _ = self._predictor.predict(point_coords=None,
+                                                    point_labels=None,
+                                                    box=slice_boxes[None, :],
+                                                    multimask_output=False)
+                torch.cuda.empty_cache()
+        
             contours = self._sam2masks_to_contours(masks)
             slice_buffer["masks"] = masks
             slice_buffer["contours"] = contours
@@ -124,11 +127,12 @@ class SAM2Segment:
         if not isinstance(boxes, np.ndarray):
             boxes = np.array(boxes)
 
-        self._predictor.set_image(img)
-        masks, _, _ = self._predictor.predict(point_coords=None,
-                                              point_labels=None,
-                                              box=boxes,
-                                              multimask_output=False)
+        with torch.no_grad():
+            self._predictor.set_image(img)
+            masks, _, _ = self._predictor.predict(point_coords=None,
+                                                point_labels=None,
+                                                box=boxes,
+                                                multimask_output=False)
 
         return masks
 
