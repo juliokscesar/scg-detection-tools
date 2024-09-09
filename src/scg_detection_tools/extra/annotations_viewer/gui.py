@@ -20,14 +20,14 @@ def display_gui(window_name="Annotations Viewer", img: np.ndarray = None, ann_co
         raise ValueError("Arguments 'img', 'ann_contours' and 'ann_classes' are all required to display GUI")
 
     POSSIBLE_COLORS = [
-        [30, 6, 255],
-        [255, 128, 197],
-        [234, 86, 69],
-        [0,0,0],
+        [255, 0, 0],        # red
+        [0, 0, 0],          # black
+        [0, 191, 255],      # deepskyblue
+        [0,255,0],          # lime
     ]
 
     class_colors = {i: POSSIBLE_COLORS[i] for i in range(len(POSSIBLE_COLORS))}
-    ALPHA = 0.9
+    ALPHA = 0.6
 
     cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
     highlight = -1

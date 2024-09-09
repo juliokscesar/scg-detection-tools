@@ -11,8 +11,9 @@ def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mas
     if not binary_mask:
         mask = np.where(mask == 255, 1, 0)
     mask = mask.astype(np.uint8)
+    h, w = mask.shape[:2]
     
-    mask_img = mask * np.concatenate((color, [alpha])).reshape(1,1,-1)
+    mask_img = mask.reshape(h,w,1) * np.concatenate((color, [alpha])).reshape(1,1,-1)
 
     # mask_img = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
     # color_img = np.full_like(mask_img, color, dtype=np.uint8)
