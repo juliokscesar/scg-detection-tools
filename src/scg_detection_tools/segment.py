@@ -133,6 +133,7 @@ class SAM2Segment:
                                                 point_labels=None,
                                                 box=boxes,
                                                 multimask_output=False)
+            torch.cuda.empty_cache()
 
         return masks
 
