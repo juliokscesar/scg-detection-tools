@@ -182,3 +182,7 @@ class SAM2Segment:
 
         return mask_contours
 
+
+    # empty cache on destruction
+    def __del__(self):
+        torch.cuda.empty_cache()
