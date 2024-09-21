@@ -1,4 +1,5 @@
 import torch
+from super_gradients import setup_device
 from super_gradients.training import models
 from super_gradients import Trainer
 from super_gradients.training.dataloaders.dataloaders import (
@@ -21,6 +22,10 @@ def train_yolo_nas(dataset_dir: str,
                    pretrained_checkpoint_path: str = None,
                    checkpoint_out_dir: str = f"yolonas_trainings",
                    experiment_name: str = "yolonas_train"):
+
+    # super-gradients is not working
+    if torch.cuda.is_available() and multi_gpu:
+        setup_device(num_gpus=num_gpus)
 
     trainer = Trainer(experiment_name=experiment_name, ckpt_root_dir=checkpoint_out_dir)
 
@@ -84,6 +89,8 @@ def train_yolo_nas(dataset_dir: str,
 
     train_params = {
         "average_best_models": False,
+        "multi_gpu": multi_gpu,
+        "num_gpus": num_gpus,
         "warmup_mode": "linear_epoch_step",
         "warmup_initial_lr": 1e-6,
         "lr_warmup_epochs": 3,

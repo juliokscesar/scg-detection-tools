@@ -82,8 +82,7 @@ class Dataset:
 
             for img in img_paths:
                 ann_file = os.path.join(ann_dir, Path(img).stem + ".txt")
-                full_img_path = os.path.join(img_dir, img)
-                data_img = {"image": full_img_path, "annotations": ""}
+                data_img = {"image": img, "annotations": ""}
                 if file_exists(ann_file):
                     data_img["annotations"] = ann_file
 

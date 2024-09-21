@@ -19,6 +19,10 @@ class Detector:
         self._det_model = detection_model
         if detection_params is None:
             detection_params = DEFAULT_DETECTION_PARAMS
+        else:
+            for key in DEFAULT_DETECTION_PARAMS:
+                if key not in detection_params:
+                    detection_params[key] = DEFAULT_DETECTION_PARAMS[key]
         self._det_params = detection_params
         
         if specific_det_params is not None:
