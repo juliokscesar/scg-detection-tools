@@ -10,7 +10,7 @@ DEFAULT_DETECTION_PARAMS = {
         "use_slice": False,
         "slice_wh": (640, 640),
         "slice_overlap_ratio": (0.2, 0.2),
-        "slice_iou_threshold": 0.4,
+        "slice_iou_threshold": 0.3,
         "embed_slice_callback": None
 }
 
