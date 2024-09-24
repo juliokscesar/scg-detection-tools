@@ -121,7 +121,6 @@ class YOLOv8(BaseDetectionModel):
               batch=8, 
               device: Union[list, str, int] = "cpu", 
               workers=6):
-        
         data_yaml = os.path.join(dataset_dir, "data.yaml")
         if not file_exists(data_yaml):
             raise FileExistsError(f"No 'data.yaml' found in dataset directory {dataset_dir}")
