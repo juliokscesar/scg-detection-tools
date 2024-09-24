@@ -120,26 +120,40 @@ class SAM2Segment:
         else:
             img = img_p
 
-
         if len(boxes) == 0:
-            return []
+            return np.array([])
     
         if not isinstance(boxes, np.ndarray):
             boxes = np.array(boxes)
 
+        # If too much boxes (default 300), break in batches because it can overhead memory easily otherwise
+        MASK_BATCH = 300
         with torch.no_grad():
             self._predictor.set_image(img)
-            masks, _, _ = self._predictor.predict(point_coords=None,
-                                                point_labels=None,
-                                                box=boxes,
-                                                multimask_output=False)
-            torch.cuda.empty_cache()
+            if len(boxes) < MASK_BATCH:
+                masks, _, _ = self._predictor.predict(point_coords=None,
+                                                      point_labels=None,
+                                                      box=boxes,
+                                                      multimask_output=False)
+            else:
+                masks = []
+                for i in range(0, len(boxes), MASK_BATCH):
+                    seg_masks, _, _ = self._predictor.predict(point_coords=None,
+                                                              point_labels=None,
+                                                              box=boxes[i:(i+MASK_BATCH)],
+                                                              multimask_output=False)
+                    masks.extend(seg_masks)
+                    torch.cuda.empty_cache()
+                masks = np.array(masks)
 
+        torch.cuda.empty_cache()
         return masks
+    
 
     def _load_sam2(self, ckpt_path: str, cfg: str, custom_state_dict: str = None):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         torch.autocast(device, dtype=torch.bfloat16).__enter__()
+        self._device = device
 
         sam2_model = build_sam2(cfg, ckpt_path, device=device)
         predictor = SAM2ImagePredictor(sam2_model)

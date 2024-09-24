@@ -11,6 +11,7 @@ DEFAULT_DETECTION_PARAMS = {
         "slice_wh": (640, 640),
         "slice_overlap_ratio": (0.2, 0.2),
         "slice_iou_threshold": 0.3,
+        "slice_fill": True,
         "embed_slice_callback": None
 }
 
@@ -55,6 +56,7 @@ class Detector:
                                                        slice_wh=self._det_params["slice_wh"],
                                                        slice_overlap_ratio=self._det_params["slice_overlap_ratio"],
                                                        slice_iou_threshold=self._det_params["slice_iou_threshold"],
+                                                       slice_fill=self._det_params["slice_fill"],
                                                        embed_slice_callback=self._det_params["embed_slice_callback"])
         else:
             detections = self._det_model.predict(img_path=image_path,

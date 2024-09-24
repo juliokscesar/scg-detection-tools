@@ -40,18 +40,20 @@ class BaseDetectionModel(ABC):
                       slice_wh: tuple,
                       slice_overlap_ratio: tuple,
                       slice_iou_threshold: float,
+                      slice_fill = True,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         def sv_slice_callback(image: np.ndarray) -> sv.Detections:
-            # Check if slice is smaller than the desired (640x640)
+            # Check if slice is smaller than the desired
             # if so, then fills to the right and to bottom with black pixels
-            # to get (640x640), but without changing the original pixels coordinates
+            # to get, but without changing the original pixels coordinates
             sliceimg = image.copy()
-            h, w = sliceimg.shape[:2]
-            sh, sw = slice_wh
-            bot_fill = sh - h
-            right_fill = sw - w
-            if bot_fill or right_fill:
-                sliceimg = cv2.copyMakeBorder(sliceimg, 0, bot_fill, 0, right_fill, cv2.BORDER_CONSTANT, None, np.zeros(3))
+            if slice_fill:
+                h, w = sliceimg.shape[:2]
+                sh, sw = slice_wh
+                bot_fill = sh - h
+                right_fill = sw - w
+                if bot_fill or right_fill:
+                    sliceimg = cv2.copyMakeBorder(sliceimg, 0, bot_fill, 0, right_fill, cv2.BORDER_CONSTANT, None, np.zeros(3))
 
             tmpfile = generete_temp_path(suffix=Path(img_path).suffix)
             with open(tmpfile, "wb") as f:
@@ -112,8 +114,9 @@ class YOLOv8(BaseDetectionModel):
                       slice_wh: tuple,
                       slice_overlap_ratio: tuple,
                       slice_iou_threshold: float,
+                      slice_fill = True,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
-        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
+        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, slice_fill, embed_slice_callback)
 
     def train(self, 
               dataset_dir: str, 
@@ -158,8 +161,9 @@ class YOLO_NAS(BaseDetectionModel):
                       slice_wh: tuple,
                       slice_overlap_ratio: tuple,
                       slice_iou_threshold: float,
+                      slice_fill = True,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
-        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
+        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, slice_fill, embed_slice_callback)
 
 
     def train(self, 
@@ -217,8 +221,9 @@ class RoboflowModel(BaseDetectionModel):
                       slice_wh: tuple,
                       slice_overlap_ratio: tuple,
                       slice_iou_threshold: float,
+                      slice_fill = True,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
-        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, embed_slice_callback)
+        return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, slice_fill, embed_slice_callback)
 
 
     def train(self, 
