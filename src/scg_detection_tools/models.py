@@ -102,7 +102,7 @@ class YOLOv8(BaseDetectionModel):
                                                  imgsz=640,
                                                  conf=confidence / 100.0,
                                                  iou=overlap / 100.0,
-                                                 max_det=1500)
+                                                 max_det=10000)
         detections = sv.Detections.from_ultralytics(results[0])
         return detections
 

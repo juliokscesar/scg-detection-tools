@@ -30,8 +30,9 @@ def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mas
 def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thickness: int = 1) -> np.ndarray:
     box_annotator = sv.BoxAnnotator(thickness=box_thickness)
     default_img = cv2.imread(default_imgpath)
+    #default_img = cv2.cvtColor(default_img, cv2.COLOR_BGR2RGB)
 
-    annotated_img = box_annotator.annotate(scene=default_img.copy(),
+    annotated_img = box_annotator.annotate(scene=default_img,
                                            detections=detections)
     return annotated_img
 

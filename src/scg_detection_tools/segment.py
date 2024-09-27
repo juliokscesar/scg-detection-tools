@@ -127,7 +127,7 @@ class SAM2Segment:
             boxes = np.array(boxes)
 
         # If too much boxes (default 300), break in batches because it can overhead memory easily otherwise
-        MASK_BATCH = 300
+        MASK_BATCH = 200
         with torch.no_grad():
             self._predictor.set_image(img)
             if len(boxes) < MASK_BATCH:
@@ -152,7 +152,7 @@ class SAM2Segment:
 
     def _load_sam2(self, ckpt_path: str, cfg: str, custom_state_dict: str = None):
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        torch.autocast(device, dtype=torch.bfloat16).__enter__()
+        #torch.autocast(device, dtype=torch.bfloat16).__enter__()
         self._device = device
 
         sam2_model = build_sam2(cfg, ckpt_path, device=device)

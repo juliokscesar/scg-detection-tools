@@ -242,7 +242,7 @@ def detect(args):
     detections = detector.detect_objects(img_files)
     print("img_files:", img_files, "len(det)=", len(detections))
     for img,detection in zip(img_files, detections):
-        annotated = box_annotated_image(img, detection)
+        annotated = box_annotated_image(img, detection, box_thickness=2)
 
         if not args.no_show:
             plot_image(annotated)
