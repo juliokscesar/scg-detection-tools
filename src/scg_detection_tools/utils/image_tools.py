@@ -12,28 +12,22 @@ def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mas
         mask = np.where(mask == 255, 1, 0)
     mask = mask.astype(np.uint8)
     h, w = mask.shape[:2]
-    
     mask_img = mask.reshape(h,w,1) * np.concatenate((color, [alpha])).reshape(1,1,-1)
-
-    # mask_img = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
-    # color_img = np.full_like(mask_img, color, dtype=np.uint8)
-    # alpha_channel = (mask * alpha * 255).astype(np.uint8)
-    # color_with_alpha = cv2.merge([color_img[:,:,0],
-    #                               color_img[:,:,1],
-    #                               color_img[:,:,2],
-    #                               alpha_channel])
-
-
-
     return mask_img
 
-def box_annotated_image(default_imgpath: str, detections: sv.Detections, box_thickness: int = 1) -> np.ndarray:
-    box_annotator = sv.BoxAnnotator(thickness=box_thickness)
-    default_img = cv2.imread(default_imgpath)
-    #default_img = cv2.cvtColor(default_img, cv2.COLOR_BGR2RGB)
-
-    annotated_img = box_annotator.annotate(scene=default_img,
-                                           detections=detections)
+def box_annotated_image(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_thickness: int = 1) -> np.ndarray:
+    # box_annotator = sv.BoxAnnotator(thickness=box_thickness)
+    if isinstance(img, str):
+        img = cv2.imread(img)
+    if isinstance(boxes, sv.Detections):
+        boxes = boxes.xyxy.astype(np.int32)
+    # annotated_img = box_annotator.annotate(scene=img,
+    #                                        detections=detections)
+    annotated_img = img.copy()
+    BOX_COLOR = [255, 0, 255] # magenta
+    for box in boxes:
+        x1, y1, x2, y2 = box
+        annotated_img = cv2.rectangle(annotated_img, (x1, y1), (x2, y2), color=BOX_COLOR, thickness=box_thickness)
     return annotated_img
 
 def segment_annotated_image(default_img: Union[str,np.ndarray], mask: np.ndarray, color: np.ndarray, alpha: float) -> np.ndarray:
@@ -111,12 +105,20 @@ def crop_box_image(img: Union[np.ndarray, str],
     row0, col0, row1, col1 = box_xyxy
     return img[col0:(col1+1), row0:(row1+1)]
 
+def plot_image_detection(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_thickness: int = 1, cvt_to_rgb=True):
+    if isinstance(img, str):
+        img = cv2.imread(img)
+    
+    if isinstance(boxes, sv.Detections):
+        boxes = boxes.xyxy.astype(np.int32)
+    annotated = box_annotated_image(img, boxes, box_thickness=box_thickness)
+    plot_image(annotated, cvt_to_rgb=cvt_to_rgb)
 
 def save_image_detection(default_imgpath: str,
                          detections: sv.Detections,
                          save_name: str,
                          save_dir: str,
                          box_thicknes: int = 1):
-    annotated = box_annotated_image(default_imgpath, detections, box_thicknes)
+    annotated = box_annotated_image(default_imgpath, detections.xyxy.astype(np.int32), box_thicknes)
     save_image(annotated, save_name, save_dir)
 
