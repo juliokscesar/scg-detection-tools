@@ -7,7 +7,7 @@ DEFAULT_DETECTION_PARAMS = {
         "confidence": 50.0,
         "overlap": 50.0,
 
-        "use_slice": False,
+        "slice_detect": False,
         "slice_wh": (640, 640),
         "slice_overlap_ratio": (0.2, 0.2),
         "slice_iou_threshold": 0.3,
@@ -48,8 +48,8 @@ class Detector:
             raise ValueError("'img' argument must be either a string or a list of strings")
 
     def _detect_single_image(self, image_path: str) -> sv.Detections:
-        use_slice = self._det_params["use_slice"]
-        if use_slice:
+        slice_detect = self._det_params["slice_detect"]
+        if slice_detect:
             detections = self._det_model.slice_predict(img_path=image_path,
                                                        confidence=self._det_params["confidence"],
                                                        overlap=self._det_params["overlap"],

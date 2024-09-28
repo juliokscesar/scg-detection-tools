@@ -69,7 +69,7 @@ def read_detection_boxes_file(file: str) -> list:
             boxes.append(box)
     return boxes
 
-def read_cached_detections(img_files: str, path: str) -> list:
+def read_cached_detections(img_files: str, path: str) -> List[str]:
     cache_loc = path
     cache_files = get_all_files_from_paths(cache_loc, skip_ext=[".png", ".jpeg", ".jpg"])
     imgboxes = {}
@@ -82,3 +82,13 @@ def read_cached_detections(img_files: str, path: str) -> list:
 
     return imgboxes
 
+def get_annotation_files(imgs: List[str], annotations_path: str):
+    img_ann = {}
+    ann_files = [os.path.join(annotations_path, f) for f in get_all_files_from_paths(annotations_path)]
+    for img in imgs:
+        ann_match = [file for file in ann_files if Path(file).stem == Path(img).stem]
+        if len(ann_match) == 0:
+            img_ann[img] = None
+        else:
+            img_ann[img] = ann_match[0]
+    return img_ann

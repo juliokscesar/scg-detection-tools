@@ -46,7 +46,7 @@ class SAM2Segment:
         assert(detections is not None)
 
         print(f"DEBUG segment.py: detected {len(detections.xyxy)} in image {img_path}")
-        masks = self._segment_detection(img_path, detections)
+        masks = self.segment_detection(img_path, detections)
 
         return masks, self._sam2masks_to_contours(masks)
 
@@ -108,12 +108,12 @@ class SAM2Segment:
         return masks
 
 
-    def _segment_detection(self, img_p: Union[str,np.ndarray], detections: sv.Detections):
+    def segment_detection(self, img_p: Union[str,np.ndarray], detections: sv.Detections):
         boxes = detections.xyxy.astype(np.int32)
-        return self._segment_boxes(img_p, boxes)
+        return self.segment_boxes(img_p, boxes)
 
 
-    def _segment_boxes(self, img_p: Union[str,np.ndarray], boxes: np.ndarray):
+    def segment_boxes(self, img_p: Union[str,np.ndarray], boxes: np.ndarray):
         if isinstance(img_p, str):
             img = cv2.imread(img_p)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)

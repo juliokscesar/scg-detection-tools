@@ -238,3 +238,10 @@ class RoboflowModel(BaseDetectionModel):
 def get_opt_device():
     return "cuda" if torch.cuda.is_available() else "cpu"
 
+def from_type(model_type: str, model_path: str, data_classes = ["leaf"], yolonas_arch = "yolo_nas_l"):
+    if model_type == "yolov8":
+        return YOLOv8(model_path)
+    elif model_type == "yolonas":
+        return YOLO_NAS(yolonas_arch, model_path, data_classes)
+    else:
+        raise NotImplemented()
