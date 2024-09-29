@@ -28,7 +28,7 @@ class BaseDetectionModel(ABC):
 
 
     @abstractmethod
-    def predict(self, img_path: str, confidence: float, overlap: float) -> sv.Detections:
+    def predict(self, img_path: str, confidence: float, overlap: float, box_filter=True, box_filter_iou=0.8) -> sv.Detections:
         pass
 
 
@@ -41,6 +41,8 @@ class BaseDetectionModel(ABC):
                       slice_overlap_ratio: tuple,
                       slice_iou_threshold: float,
                       slice_fill = True,
+                      box_filter=True,
+                      box_filter_iou=0.8,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         def sv_slice_callback(image: np.ndarray) -> sv.Detections:
             # Check if slice is smaller than the desired
