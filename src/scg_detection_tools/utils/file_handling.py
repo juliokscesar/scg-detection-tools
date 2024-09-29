@@ -24,7 +24,12 @@ def file_ext(file_path: str) -> str:
     _, ext = os.path.splitext(file_path)
     return ext
 
-def get_all_files_from_paths(*args, skip_ext: List[str] = None):
+
+def sort_stem(item):
+    s = Path(item).stem
+    return int(s) if s.isnumeric() else s
+
+def get_all_files_from_paths(*args, skip_ext: List[str] = None, stem_sort=False):
     files = []
     for path in args:
         if os.path.isfile(path):
@@ -42,7 +47,8 @@ def get_all_files_from_paths(*args, skip_ext: List[str] = None):
         
         else:
             raise RuntimeError(f"{path} is an invalid file source")
-
+    if stem_sort:
+        files = sorted(files, key=sort_stem)
     return files
 
 
