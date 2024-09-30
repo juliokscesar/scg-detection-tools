@@ -12,7 +12,10 @@ DEFAULT_DETECTION_PARAMS = {
         "slice_overlap_ratio": (0.2, 0.2),
         "slice_iou_threshold": 0.3,
         "slice_fill": True,
-        "embed_slice_callback": None
+        "embed_slice_callback": None,
+
+        "box_filter": False,
+        "box_filter_thresh": 0.95,
 }
 
 class Detector:
@@ -33,6 +36,12 @@ class Detector:
     def __call__(self, img):
         return self.detect_objects(img)
 
+    def update_parameters(self, **params):
+        for param in params:
+            assert(param in DEFAULT_DETECTION_PARAMS)
+            assert(type(params[param]) == type(DEFAULT_DETECTION_PARAMS[param]))
+            self._det_params[param] = params[param]
+
     # Returns a list of detections for every image (even for a single image)
     def detect_objects(self, img: Union[list, str], **diff_det_params) -> list:
         for param in diff_det_params:
@@ -50,18 +59,26 @@ class Detector:
     def _detect_single_image(self, image_path: str) -> sv.Detections:
         slice_detect = self._det_params["slice_detect"]
         if slice_detect:
-            detections = self._det_model.slice_predict(img_path=image_path,
-                                                       confidence=self._det_params["confidence"],
-                                                       overlap=self._det_params["overlap"],
-                                                       slice_wh=self._det_params["slice_wh"],
-                                                       slice_overlap_ratio=self._det_params["slice_overlap_ratio"],
-                                                       slice_iou_threshold=self._det_params["slice_iou_threshold"],
-                                                       slice_fill=self._det_params["slice_fill"],
-                                                       embed_slice_callback=self._det_params["embed_slice_callback"])
+            detections = self._det_model.slice_predict(
+                img_path=image_path,
+                confidence=self._det_params["confidence"],
+                overlap=self._det_params["overlap"],
+                slice_wh=self._det_params["slice_wh"],
+                slice_overlap_ratio=self._det_params["slice_overlap_ratio"],
+                slice_iou_threshold=self._det_params["slice_iou_threshold"],
+                slice_fill=self._det_params["slice_fill"],
+                embed_slice_callback=self._det_params["embed_slice_callback"],
+                box_filter=self._det_params["box_filter"],
+                box_filter_thresh=self._det_params["box_filter_thresh"],
+            )
         else:
-            detections = self._det_model.predict(img_path=image_path,
-                                                 confidence=self._det_params["confidence"],
-                                                 overlap=self._det_params["overlap"])
+            detections = self._det_model.predict(
+                img_path=image_path,
+                confidence=self._det_params["confidence"],
+                overlap=self._det_params["overlap"],
+                box_filter=self._det_params["box_filter"],
+                box_filter_thresh=self._det_params["box_filter_thresh"],
+            )
         return detections
 
 
