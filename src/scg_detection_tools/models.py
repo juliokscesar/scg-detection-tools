@@ -33,7 +33,6 @@ class BaseDetectionModel(ABC):
     def predict(self, img_path: str, confidence: float, overlap: float, box_filter=False, box_filter_thresh=0.8) -> sv.Detections:        
         detections  = self._underlying_model_predict(img_path, confidence, overlap)
         if box_filter:
-            print(f"!!!!!!!!!!!!!!!!!!!!!!!!! CALLED BOX FILTER ENABLED FOR IMAGE {img_path} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             detections = filter_detections_xyxy(detections, intersection_thresh=box_filter_thresh)
         return detections
 
@@ -83,7 +82,6 @@ class BaseDetectionModel(ABC):
                                     iou_threshold=slice_iou_threshold)
         sliced_detections = slicer(image=img)
         if box_filter:
-            print(f"!!!!!!!!!!!!!!!!!!!!!!!!! SLICE CALLED BOX FILTER ENABLED FOR IMAGE {img_path} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             sliced_detections = filter_detections_xyxy(sliced_detections, intersection_thresh=box_filter_thresh)
         return sliced_detections
 
@@ -103,7 +101,7 @@ class YOLOv8(BaseDetectionModel):
         yolo_model = YOLO(yolov8_ckpt_path)
         self._device = get_opt_device()
         super().__init__(model_type="yolov8", model_ckpt_path=yolov8_ckpt_path, underlying_model=yolo_model)
-        self._unde
+
 
     def _underlying_model_predict(self, img_path: str, confidence: float, overlap: float) -> sv.Detections:
         results = self._underlying_model.predict(img_path,
@@ -114,17 +112,6 @@ class YOLOv8(BaseDetectionModel):
         detections = sv.Detections.from_ultralytics(results[0])
         return detections
 
-
-    # def slice_predict(self, 
-    #                   img_path: str,
-    #                   confidence: float,
-    #                   overlap: float,
-    #                   slice_wh: tuple,
-    #                   slice_overlap_ratio: tuple,
-    #                   slice_iou_threshold: float,
-    #                   slice_fill = True,
-    #                   embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
-    #     return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, slice_fill, embed_slice_callback)
 
     def train(self, 
               dataset_dir: str, 
@@ -160,18 +147,6 @@ class YOLO_NAS(BaseDetectionModel):
                                                  iou=overlap / 100.0)
         detections = sv.Detections.from_yolo_nas(results)
         return detections
-
-
-    # def slice_predict(self, 
-    #                   img_path: str,
-    #                   confidence: float,
-    #                   overlap: float,
-    #                   slice_wh: tuple,
-    #                   slice_overlap_ratio: tuple,
-    #                   slice_iou_threshold: float,
-    #                   slice_fill = True,
-    #                   embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
-    #     return super().slice_predict(img_path, confidence, overlap, slice_wh, slice_overlap_ratio, slice_iou_threshold, slice_fill, embed_slice_callback)
 
 
     def train(self, 
@@ -304,8 +279,6 @@ def filter_detections_xyxy(detections: sv.Detections, intersection_thresh: float
         boxes = np.delete(boxes, idx, axis=0)
         box_classes = np.delete(box_classes, idx)
         box_confidence = np.delete(box_confidence, idx)
-    print("Filter: removing boxes:", remove)
-
     new_det = sv.Detections(xyxy=boxes, class_id=box_classes, confidence=box_confidence)
     return new_det
 
