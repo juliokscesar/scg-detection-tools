@@ -25,7 +25,7 @@ def segment_to_box(seg_contour: np.ndarray, normalized=False, imgsz: Tuple[int,i
 # is white
 # Each contour in 'contours' contains N points that describes the contour
 # but FLATTENED: countour = x0, y0, x1, y1, ..., xn, yn
-def contours_to_masks(contours: list, imgsz: Tuple[int, int], normalized=True):
+def contours_to_masks(contours: list, imgsz: Tuple[int, int], normalized=True, binary_mask=True):
     masks = []
 
     for contour in contours:
@@ -42,6 +42,8 @@ def contours_to_masks(contours: list, imgsz: Tuple[int, int], normalized=True):
 
         maskimg = np.zeros(imgsz, dtype=np.uint8)
         cv2.fillPoly(maskimg, [points], color=255)
+        if binary_mask:
+            maskimg = np.where(maskimg == 255, 1, 0)
         masks.append(maskimg)
 
     return masks
@@ -80,6 +82,19 @@ def detbox_to_yolo_fmt(boxes: np.ndarray, imgsz: Tuple[int], normalized=False):
         yolo_boxes.append([x_center, y_center, width, height])
 
     return yolo_boxes
+
+def yolo_boxes_to_absolute(yolo_fmt_boxes: np.ndarray, imgsz: Tuple[int]) -> np.ndarray:
+    abs_boxes = []
+    imgw, imgh = [float(x) for x in imgsz]
+    for box in yolo_fmt_boxes:
+        xcenter, ycenter, width, height = box
+        x1 = xcenter - width
+        y1 = ycenter - height
+        x2 = xcenter + width
+        y2 = ycenter + height
+        abs_boxes.append(np.array([x1 * imgw, y1 * imgh, x2 * imgw, y2 * imgh]))
+    return np.array(abs_boxes).astype(np.int32)
+        
 
 def contour_to_yolo_fmt(contours: list, imgsz: Tuple[int], normalized=False):
     """ 

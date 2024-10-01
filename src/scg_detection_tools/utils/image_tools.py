@@ -2,14 +2,15 @@ import supervision as sv
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from typing import Union
+from typing import Union, Tuple, List
 import os
 
 from scg_detection_tools.utils.file_handling import get_all_files_from_paths
+import scg_detection_tools.utils.cvt as cvt
 
 def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mask=True) -> np.ndarray:
-    if not binary_mask:
-        mask = np.where(mask == 255, 1, 0)
+    if binary_mask:
+        mask = mask * 255
     mask = mask.astype(np.uint8)
     h, w = mask.shape[:2]
     mask_img = mask.reshape(h,w,1) * np.concatenate((color, [alpha])).reshape(1,1,-1)
@@ -38,7 +39,7 @@ def segment_annotated_image(default_img: Union[str,np.ndarray], mask: np.ndarray
         img = default_img.copy()
         if img.shape[-1] < 4 or img.ndim == 2:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
-            img[:,:,3] = 255
+    img[:,:,3] = 255
 
     maskimg = mask_img_alpha(mask=mask.astype(np.uint8), color=color, alpha=alpha)
 
@@ -50,6 +51,14 @@ def segment_annotated_image(default_img: Union[str,np.ndarray], mask: np.ndarray
         masked_img[:,:,c] = alpha_mk * maskimg[:,:,c] + alpha_im * masked_img[:,:,c] * (1 - alpha_mk)
     
     return masked_img
+
+def contour_annotated_image(img: Union[str, np.ndarray], contour: np.ndarray, color: np.ndarray, alpha: float, normalized=True) -> np.ndarray:
+    if isinstance(img, str):
+        img = cv2.imread(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+    mask = cvt.contours_to_masks([contour], imgsz=img.shape[1::-1], normalized=normalized, binary_mask=True)[0]
+    return segment_annotated_image(img, mask, color, alpha)
+
 
 def plot_image(img: np.ndarray, cvt_to_rgb=True):
     if img.ndim == 2:
@@ -122,3 +131,80 @@ def save_image_detection(default_imgpath: str,
     annotated = box_annotated_image(default_imgpath, detections.xyxy.astype(np.int32), box_thicknes)
     save_image(annotated, save_name, save_dir)
 
+
+def create_annotation_batch(imgs: Union[List[np.ndarray], List[str]], imgsz: Tuple[int,int], contours: List[np.ndarray],images_per_batch: int):
+    assert((len(imgs) > images_per_batch))
+    
+    ## PREPROCESS IMAGES    
+    # STD_IMG_SHAPE = (h, w, c)
+    STD_IMG_SHAPE = list(imgsz); STD_IMG_SHAPE.append(3)
+    STD_IMG_SHAPE = tuple(STD_IMG_SHAPE)
+    for i, img in enumerate(imgs):
+        if isinstance(img, str):
+            img = cv2.imread(img)
+        assert(img is not None)
+        # Resize to standard size
+        if (img.shape != STD_IMG_SHAPE):
+            img = cv2.resize(img, STD_IMG_SHAPE[:2], cv2.INTER_CUBIC)
+        imgs[i] = img
+    imgs = np.array(imgs)
+
+    # Grid for placing images
+    grid_size = int(np.ceil(np.sqrt(images_per_batch)))
+    scaled_imgsz = (STD_IMG_SHAPE[0] // grid_size, STD_IMG_SHAPE[1] // grid_size, STD_IMG_SHAPE[2])
+    num_batches = int(np.ceil(len(imgs) / images_per_batch))
+    batches = np.zeros((num_batches, STD_IMG_SHAPE[0], STD_IMG_SHAPE[1], STD_IMG_SHAPE[2]), dtype=np.uint8)
+    batch_contours = []
+
+    for batch_idx in range(0, num_batches):
+        batch_imgs = imgs[(batch_idx*images_per_batch):((batch_idx*images_per_batch)+images_per_batch)]
+        batch_contours.append([])
+        for img_idx, img in enumerate(batch_imgs):
+            scaled = cv2.resize(img, scaled_imgsz[:2])
+            # Position of the image in the grid
+            row = img_idx // grid_size
+            col = img_idx % grid_size
+            x_offset = col * scaled_imgsz[1]
+            y_offset = row * scaled_imgsz[0]
+            batches[batch_idx][y_offset:(y_offset+scaled_imgsz[0]), x_offset:(x_offset+scaled_imgsz[1])] = scaled
+
+            # adjust countours
+            for contour in contours[(batch_idx*images_per_batch)+img_idx]:
+                if len(contour) == 4: # contour is a box
+                    x_center, y_center, box_w, box_h = contour
+                    # Convert normalized to absolute coordinates
+                    x_center *= STD_IMG_SHAPE[1]
+                    y_center *= STD_IMG_SHAPE[0]
+                    box_w *= STD_IMG_SHAPE[1]
+                    box_h *= STD_IMG_SHAPE[0]
+
+                    x_center_scaled = (x_center * scaled_imgsz[1] / STD_IMG_SHAPE[1]) + x_offset
+                    y_center_scaled = (y_center * scaled_imgsz[0] / STD_IMG_SHAPE[0]) + y_offset
+                    box_w_scaled = box_w * scaled_imgsz[1] / STD_IMG_SHAPE[1]
+                    box_h_scaled = box_h * scaled_imgsz[0] / STD_IMG_SHAPE[0]
+                    batch_box = np.array(
+                        [
+                            x_center_scaled / STD_IMG_SHAPE[1], 
+                            y_center_scaled / STD_IMG_SHAPE[0], 
+                            box_w_scaled / STD_IMG_SHAPE[1], 
+                            box_h_scaled / STD_IMG_SHAPE[0],
+                        ]
+                    )
+                    batch_contours[-1].append(batch_box)
+                else: # contour is a segmentation contour
+                    if not isinstance(contour, np.ndarray):
+                        contour = np.array(contour)
+                    # contour comes as an array of (Npoints) x0 y0 y1 x1 ... xn yn all normalized
+                    contour = contour.reshape(len(contour) // 2, 2) # reshape into (Npoints, 2)
+                    for i, (x,y) in enumerate(contour):
+                        x_abs = x * STD_IMG_SHAPE[1]
+                        y_abs = y * STD_IMG_SHAPE[0]
+                        x_s = (x_abs * scaled_imgsz[1] / STD_IMG_SHAPE[1]) + x_offset
+                        y_s = (y_abs * scaled_imgsz[0] / STD_IMG_SHAPE[0]) + y_offset
+                        x_n = x_s / STD_IMG_SHAPE[1]
+                        y_n = y_s / STD_IMG_SHAPE[0]
+                        contour[i] = np.array((x_n, y_n))
+                    batch_contours[-1].append(contour.flatten())
+                    
+
+    return batches, batch_contours

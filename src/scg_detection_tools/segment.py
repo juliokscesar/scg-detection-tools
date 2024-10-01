@@ -85,7 +85,7 @@ class SAM2Segment:
             result["slices"].append(slice_buffer)
 
         detections = self._detector.detect_objects(img=img_path,
-                                                   use_slice=True,
+                                                   slice_detect=True,
                                                    embed_slice_callback=segment_slice_callback,
                                                    slice_wh=slice_wh)[0]
         result["detections"] = detections

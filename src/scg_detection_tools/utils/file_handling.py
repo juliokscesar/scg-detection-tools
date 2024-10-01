@@ -88,7 +88,7 @@ def read_cached_detections(img_files: str, path: str) -> List[str]:
 
     return imgboxes
 
-def get_annotation_files(imgs: List[str], annotations_path: str):
+def get_annotation_files(imgs: List[str], annotations_path: str) -> dict[str, str]:
     img_ann = {}
     ann_files = [os.path.join(annotations_path, f) for f in get_all_files_from_paths(annotations_path)]
     for img in imgs:

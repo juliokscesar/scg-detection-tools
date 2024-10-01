@@ -1,4 +1,5 @@
-from typing import List
+from typing import List, Union, Tuple
+import logging
 import shutil
 import cv2
 import scipy
@@ -12,197 +13,258 @@ from scg_detection_tools.models import BaseDetectionModel
 from scg_detection_tools.detect import Detector
 from scg_detection_tools.dataset import Dataset, read_dataset_annotation
 import scg_detection_tools.utils.cvt as cvt
-from scg_detection_tools.utils.image_tools import save_image
+from scg_detection_tools.utils.image_tools import save_image, create_annotation_batch
+from scg_detection_tools.utils.file_handling import get_annotation_files
 
 
 class AugmentationSteps(Flag):
-    NONE        = auto()
-    BLUR        = auto()
-    GRAY        = auto()
-    FLIP        = auto()
-    ROTATE      = auto()
-    SHARPEN     = auto()
-    NOISE       = auto()
+    NONE            = auto()
+    BLUR            = auto()
+    GRAY            = auto()
+    FLIP            = auto()
+    ROTATE          = auto()
+    SHARPEN         = auto()
+    NOISE           = auto()
+    SCALED_BATCH    = auto()
 
     def __str__(self):
         return str(self.name)
 
+class DatasetGenerator:
+    def __init__(
+            self, 
+            img_files: List[str], 
+            class_labels: List[str], 
+            model: BaseDetectionModel = None,
+            dataset_name: str = None,
+            dataset_dir: str = None,
+            pre_annotations_path: str = None, 
+            annotation_type: str = "box",
+            sam2_path: str = None,
+            sam2_cfg: str = "sam2_hiera_t.yaml",
+            detection_parameters: dict = None,
+            save_on_slice = False,
+            on_slice_resize: Union[Tuple[int,int], None] = None,
+            augmentation_steps: AugmentationSteps = None,
+        ):
+        self._imgs = img_files
+        self._img_annotations = { img: None for img in self._imgs }
+        
+        if pre_annotations_path is not None:
+            self._load_annotations(pre_annotations_path)
+        
+        annotation_type = annotation_type.strip().lower()
+        if annotation_type not in ["box", "segment"]:
+            raise ValueError("Generated dataset annotation type must be either 'box' or 'segment'")
+        if (annotation_type == "segment") and (sam2_path is None):
+            raise ValueError("Generated dataset of type 'segment' requires SAM2 checkpoint path.")
 
-def generate_dataset(name: str, 
-                     out_dir: str,
-                     img_files: List[str],
-                     classes: List[str],
-                     model: BaseDetectionModel,
-                     sam2_ckpt_path: str = None,
-                     sam2_cfg: str = None,
-                     use_boxes=False,
-                     use_segments=False,
-                     gen_on_slice=False,
-                     slice_detect=False,
-                     imgboxes_for_segments: dict = None,
-                     augmentation_steps: AugmentationSteps = None):
-    if (not use_boxes) and (not use_segments):
-        raise ValueError("generate_dataset require either use_boxes or use_segments to be true")
+        self._cls_labels = class_labels
+        self._detector = Detector(model, detection_params=detection_parameters)
+        self._img_detections_cache = { img: None for img in self._imgs }
+        self._img_masks_cache = { img: None for img in self._imgs }
 
-    gen_dataset = Dataset(name=name, dataset_dir=out_dir, classes=classes)
-    
-    detector = Detector(model, specific_det_params={"use_slice": slice_detect})
-    for img in img_files:
-        # keep track of current amount of images to correctly name images
-        curr_data_len = 0
+        self._config = {
+            "use_pre_annotated": (pre_annotations_path is not None),
+            "dest_annotation_type": annotation_type,
+            "save_on_slice": save_on_slice,
+            "on_slice_resize": on_slice_resize,
+            "sam2_path": sam2_path,
+            "sam2_cfg": sam2_cfg,
+            "augmentation_steps": augmentation_steps,
+            "detection_parameters": self._detector._det_params,
+        }
 
-        added_imgs = []
-        added_anns = []
-        ######################################################################################
+        if dataset_name is None:
+            dataset_name = "gen_dataset"
+        if dataset_dir is  None:
+            dataset_dir = "./gen_dataset"
+        self._gen_dataset = Dataset(name=dataset_name, dataset_dir=dataset_dir, classes=class_labels)
 
-        if use_boxes:
-            if gen_on_slice:
-                def _save_slice_callback(img_path, sliceimg, tmppath, det_boxes):
-                    nonlocal curr_data_len
-                    slice_img_path = f".temp/slice_det{curr_data_len}_{os.path.basename(img_path)}"
-                    shutil.copyfile(src=tmppath, dst=slice_img_path)
+    def generate(self, save_on_finish=True):
+        if not self._config["use_pre_annotated"]:
+            self._annotate_images()
+        
+        # Add annotated images to dataset
+        for img, img_annotations in self._img_annotations.items():
+            if img_annotations is None:
+                logging.error(f"Dataset Generator on generate: img_annotations for {img} is None")
+                continue
+            self._gen_dataset.add(img_path=img, annotations=img_annotations)
 
-                    slice_ann = annotation_boxes(det_boxes, sliceimg.shape[1::-1])
-                    gen_dataset.add(img_path=slice_img_path, annotations=slice_ann)
-                    curr_data_len += 1
-                    nonlocal added_imgs, added_anns
-                    added_imgs.append(slice_img_path)
-                    added_anns.append(slice_ann)
+        if save_on_finish:
+            self.save()
 
-                
-                detector.detect_objects(img, embed_slice_callback=_save_slice_callback)
-            else:
-                detections = detector.detect_objects(img)[0]
-                img_ann = annotation_boxes(detections.xyxy, imgsz=cv2.imread(img).shape[1::-1])
-                added_imgs.append(img)
-                added_anns.append(img_ann)
+    def save(self):
+        self._gen_dataset.save()
+
+    def _annotate_images(self):
+        if self._config["save_on_slice"]:
+            slice_cache = {}
+            on_slice_resize = self._config["on_slice_resize"]
+            if self._config["dest_annotation_type"] == "box":
+                def _save_on_slice(img_path, sliceimg, tmppath, det_boxes):
+                    nonlocal slice_cache, self
+                    slice_path = os.path.join(".temp", f"onslice_{len(slice_cache)}_{os.path.basename(img_path)}")
+                    slice_img = sliceimg.copy()
+                    if on_slice_resize is not None:
+                        # there is no need to rescale boxes because they are in relative coordinates
+                        slice_img = cv2.resize(slice_img, on_slice_resize, interpolation=cv2.INTER_CUBIC)
+                    cv2.imwrite(slice_path, slice_img)
+                    slice_annotations = annotation_boxes(det_boxes, imgsz=sliceimg.shape[1::-1])
+                    slice_cache[slice_path] = slice_annotations
+                self._detector.detect_objects(self._imgs, slice_detect=True, embed_slice_callback=_save_on_slice)
+            else: # segments
+                from scg_detection_tools.segment import SAM2Segment
+                seg = SAM2Segment(
+                    sam2_ckpt_path=self._config["sam2_path"], 
+                    sam2_cfg=self._config["sam2_cfg"], 
+                    detection_assist_model=self._detector._det_model
+                )
+                for img in self._imgs:
+                    slice_wh = self._config["detection_parameters"]["slice_wh"]
+                    seg_results = seg.slice_segment_detect(img_path=img, slice_wh=slice_wh)
+                    for slice in seg_results["slices"]:
+                        tmp_path = slice["path"]
+                        slice_path = f".temp/slice_seg{len(slice_cache)}_{os.path.basename(img)}"
+                        slice_img = cv2.imread(tmp_path)
+                        slicesz = slice_img.shape[1::-1]
+                        if on_slice_resize is not None:
+                            slice_img = cv2.resize(slice_img, on_slice_resize, interpolation=cv2.INTER_CUBIC)
+                        cv2.imwrite(slice_path, slice_img)
+                        slice_ann = annotation_contours(slice["contours"], imgsz=slicesz)
+                        slice_cache[slice_path] = slice_ann
+            self._img_annotations = slice_cache
+        else:
+            self._run_detections()
+            if self._config["dest_annotation_type"] == "segment":
+                self._segment_on_annotations()
 
 
-        ######################################################################################
+    def _run_detections(self):
+        detections = self._detector(self._imgs)
+        for det, img in zip(detections, self._imgs):
+            self._img_detections_cache[img] = det
+            imgsz = cv2.imread(img).shape[1::-1]
+            ann_boxes = annotation_boxes(det.xyxy.astype(np.int32), imgsz, det_class_id=det.class_id)
+            self._img_annotations[img] = ann_boxes
 
-        if use_segments:
-            if sam2_ckpt_path is None or sam2_cfg is None:
-                raise ValueError("Must provide sam2_ckpt_path and sam2_cfg arguments for generating on segments")
+    def _segment_on_annotations(self):
+        from scg_detection_tools.segment import SAM2Segment
+        segmentor = SAM2Segment(sam2_ckpt_path=self._config["sam2_path"], sam2_cfg=self._config["sam2_cfg"])
 
-            from scg_detection_tools.segment import SAM2Segment
+        contour_annotated = {}
+        for img, img_det in self._img_detections_cache.items():
+            if img_det is None:
+                logging.error(f"Generating Dataset: trying to segment objects in image {img} but its detections is None")
+                continue
+            imgsz = cv2.imread(img).shape[1::-1]
+            img_boxes = img_det.xyxy.astype(np.int32)
+            class_id = img_det.class_id
 
-            seg = SAM2Segment(sam2_ckpt_path=sam2_ckpt_path,
-                              sam2_cfg=sam2_cfg,
-                              detection_assist_model=model)
+            img_masks = segmentor.segment_boxes(img, img_boxes)
+            self._img_masks_cache[img] = img_masks
+            img_contours = segmentor._sam2masks_to_contours(img_masks)
+
+            print(f"len(img_contours): {len(img_contours)}, len(class_id)={len(class_id)}, len(img_boxes): {len(img_boxes)}, len(img_masks): {len(img_masks)}")
+            ann_contours = annotation_contours(img_contours, imgsz, det_class_id=class_id)
+            contour_annotated[img] = ann_contours
+        self._img_annotations = contour_annotated
+
+    def _load_annotations(self, annotations_path: str):
+        self._img_annotations = get_annotation_files(self._imgs, annotations_path)
+        for img in self._img_annotations:
+            ann = read_dataset_annotation(self._img_annotations[img], separate_class=False)
+            self._img_annotations[img] = ann
+
+
             
-            if gen_on_slice:
-                seg_results = seg.slice_segment_detect(img_path=img, slice_wh=(640,640))
-                for slice in seg_results["slices"]:
-                    tmp_path = slice["path"]
-                    slice_path = f".temp/slice_seg{curr_data_len}_{os.path.basename(img)}"
-                    curr_data_len += 1
-                    shutil.copy(src=tmp_path, dst=slice_path)
-                    slice_ann = annotation_contours(slice["contours"], imgsz=(640,640))
-
-                    gen_dataset.add(img_path=slice_path, annotations=slice_ann)
-                    added_imgs.append(slice_path)
-                    added_anns.append(slice_ann)
-            else:
-                if imgboxes_for_segments is not None:
-                    masks = seg._segment_boxes(img_p=img, boxes=imgboxes_for_segments[img])
-                    contours = seg._sam2masks_to_contours(masks)
-                else:
-                    _, contours = seg.detect_segment(img, use_slice_detection=slice_detect)
-
-                img_ann = annotation_contours(contours, imgsz=cv2.imread(img).shape[1::-1])
-
-                added_imgs.append(img)
-                added_anns.append(img_ann)
-
-        ######################################################################################
-
-        gen_dataset.save()
+def augment_steps(steps: AugmentationSteps, imgs: List[str], annotations: List[List[np.ndarray]], augment_ratio=0.3, blur_sigma=5, sharpen_sigma=5, num_batches=5):
+    if AugmentationSteps.NONE in steps:
+        return None
     
-        if not gen_on_slice:
-            for img_path, img_ann in zip(added_imgs, added_anns):
-                gen_dataset.add(img_path=img_path, annotations=img_ann)
-
-        ## Augmentation steps
-        if augmentation_steps is not None:
-            for img_path,img_ann in zip(added_imgs, added_anns):
-                
-                orig_img = cv2.imread(img_path)
-                base_name = os.path.basename(img_path)
-
-                augmented = []
-
-                if AugmentationSteps.BLUR in augmentation_steps:
-                    sigma = random.randrange(3, 11+1, 2)
-                    blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
-                    path = f"blur_{base_name}"
-                    save_image(blurred, name=path, dir=".temp")
-                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
-                
-                if AugmentationSteps.GRAY in augmentation_steps:
-                    gray = cv2.cvtColor(orig_img, cv2.COLOR_BGR2GRAY)
-                    path = f"gray_{base_name}"
-                    save_image(gray, name=path, dir=".temp")
-                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
-
-                if AugmentationSteps.FLIP in augmentation_steps:
-                    raise NotImplemented()
-                    # TODO: make transformations in annotations too
-                    flip = np.flipud(orig_img)
-                    path = f"flip_{base_name}"
-                    save_image(flip, name=path, dir=".temp")
-                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
-                
-                if AugmentationSteps.ROTATE in augmentation_steps:
-                    raise NotImplemented()
-                    # TODO: make transformations in annotations too
-                    ang = random.randint(30, 270+1)
-                    rot = scipy.ndimage.rotate(orig_img, ang, reshape=False)
-                    path = f"rotate_{base_name}"
-                    save_image(rot, name=path, dir=".temp")
-                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
-
-
-                if AugmentationSteps.SHARPEN in augmentation_steps:
-                    sigma = random.randrange(3, 7+1, 2)
-                    blurred = cv2.GaussianBlur(orig_img, (sigma,sigma), 0)
-                    sharpened = cv2.addWeighted(blurred, 7.5, orig_img, -6.3, 0)
-                    path = f"sharpen_{base_name}"
-                    save_image(sharpened, name=path, dir=".temp")
-                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
-
-                
-                if AugmentationSteps.NOISE in augmentation_steps:
-                    rng = np.random.default_rng()
-                    noise = rng.normal(0, 0.6, orig_img.shape).astype(np.uint8)
-                    noisy = cv2.add(orig_img, noise)
-                    path = f"noise_{base_name}"
-                    save_image(noisy, name=path, dir=".temp")
-                    augmented.append({ "path": os.path.join(".temp", path), "annotations": img_ann })
-
-                for aug in augmented:
-                    gen_dataset.add(img_path=aug["path"], annotations=aug["annotations"])
-
-        gen_dataset.save()
-
-        ################################### END OF IMGS LOOP #################################
-
+    aug_size = int(len(imgs) * augment_ratio) 
+    idx_choices = np.random.choice(len(imgs), size=aug_size)
+    using_imgs = []
+    using_annotations = []
+    for idx in idx_choices:
+        using_imgs.append(imgs[idx])
+        using_annotations.append(annotations[idx])
     
-    return gen_dataset
-            
+    augmentations = []
+    if AugmentationSteps.BLUR in steps:
+        for img, ann in zip(using_imgs, using_annotations):
+            orig = cv2.imread(img)
+            blur = cv2.GaussianBlur(orig, (blur_sigma,blur_sigma), 0)
+            path = f"blur_{os.path.basename(img)}"
+            save_image(blur, name=path, dir=".temp")
+            augmentations.append({"path": os.path.join(".temp", path), "annotations": ann})
 
-def annotation_boxes(det_boxes, imgsz):
+    if AugmentationSteps.GRAY in steps:
+        for img, ann in zip(using_imgs, using_annotations):
+            orig = cv2.imread(img)
+            gray = cv2.cvtColor(orig, cv2.COLOR_BGR2GRAY)
+            path = f"gray_{os.path.basename(img)}"
+            save_image(gray, name=path, dir=".temp")
+            augmentations.append({"path": os.path.join(".temp", path), "annotations": ann})
+
+    if AugmentationSteps.FLIP in steps:
+        raise NotImplemented()
+    if AugmentationSteps.ROTATE in steps:
+        raise NotImplemented()
+    
+    if AugmentationSteps.SHARPEN in steps:
+        for img, ann in zip(using_imgs, using_annotations):
+            orig = cv2.imread(img)
+            blur = cv2.GaussianBlur(orig, (sharpen_sigma, sharpen_sigma), 0)
+            sharpen = cv2.addWeighted(blur, 7.5, orig, -6.3, 0)
+            path = f"sharpen_{os.path.basename(img)}"
+            save_image(sharpen, name=path, dir=".temp")
+            augmentations.append({"path": os.path.join(".temp", path), "annotations": ann})
+        
+    if AugmentationSteps.NOISE in steps:
+        for img, ann in zip(using_imgs, using_annotations):
+            orig = cv2.imread(img)
+            noise = np.random.normal(0, 0.6, orig.shape).astype(np.uint8)
+            noisy = cv2.add(orig, noise)
+            path = f"noise_{os.path.basename(img)}"
+            save_image(noisy, name=path, dir=".temp")
+            augmentations.append({"path": os.path.join(".temp", path), "annotations": ann})
+
+    if AugmentationSteps.SCALED_BATCH in steps:
+        img_contours = [ann[1:] for ann in using_annotations]
+        batches, batch_annotations = create_annotation_batch(imgs=using_imgs, imgsz=(640,640), contours=img_contours, images_per_batch=((len(using_imgs) // num_batches)+1))
+        for i, (img_batch, ann_batch) in enumerate(zip(batches, batch_annotations)):
+            # batch annotations come with just the contours, so we need to add the class in too
+            ann_with_cls = [0] * len(ann_batch)
+            for i,ann in enumerate(ann_batch):
+                ann_with_cls[i].extend(ann_batch)
+            path = f"batch_{i}.png"
+            save_image(img_batch, name=path, dir=".temp")
+            augmentations.append({"path": os.path.join(".temp", path), "annotations": ann_with_cls})
+
+    return augmentations
+
+
+def annotation_boxes(det_boxes, imgsz, det_class_id = None):
     fmt_boxes = cvt.detbox_to_yolo_fmt(det_boxes, imgsz)
     ann = []
-    for box in fmt_boxes:
-        ann.append([0])
+    for idx, box in enumerate(fmt_boxes):
+        if (det_class_id is not None) and (idx < len(det_class_id)):
+            ann.append([det_class_id[idx]])
+        else:
+            ann.append([0])
         ann[-1].extend(box)
     return ann
 
-def annotation_contours(contours, imgsz):
+def annotation_contours(contours, imgsz, det_class_id = None):
     fmt_cnt = cvt.contour_to_yolo_fmt(contours, imgsz)
     ann = []
-    for contour in fmt_cnt:
-        ann.append([0])
+    for idx, contour in enumerate(fmt_cnt):
+        if (det_class_id is not None) and (idx < len(det_class_id)):
+            ann.append([det_class_id[idx]])
+        else:
+            ann.append([0])
         ann[-1].extend(contour)
     return ann
 
