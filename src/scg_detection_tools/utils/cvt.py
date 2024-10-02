@@ -6,6 +6,11 @@ import numbers
 def segment_to_box(seg_contour: np.ndarray, normalized=False, imgsz: Tuple[int,int]=None):
     if normalized and imgsz is None:
         raise ValueError("For normalized contours, imgsz argument is required")
+    # reshape into array of (Npoinst, 2) from (x1 y1 x2 y2 x3 y3 ....)
+    if not isinstance(seg_contour, np.ndarray):
+        seg_contour = np.array(seg_contour)
+    if seg_contour.ndim != 2:
+        seg_contour = seg_contour.reshape(len(seg_contour) // 2, 2)
 
     x1, y1 = np.min(seg_contour, axis=0)
     x2, y2 = np.max(seg_contour, axis=0)
