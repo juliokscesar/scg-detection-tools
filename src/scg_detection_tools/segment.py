@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import cv2
 import numpy as np
 import torch
@@ -11,6 +12,17 @@ import queue
 import matplotlib.pyplot as plt
 
 from scg_detection_tools.detect import BaseDetectionModel, Detector
+
+
+class BaseSegmentationModel(ABC):
+    def __init__(self, model_type: str, underlying_model):
+        self._model_type = model_type
+        self._underlying_model = underlying_model
+    
+    @abstractmethod
+    def segment(self):
+        pass
+
 
 class SAM2Segment:
     def __init__(self, 

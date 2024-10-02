@@ -66,6 +66,7 @@ class DatasetGenerator:
 
         self._config = {
             "use_pre_annotated": (pre_annotations_path is not None),
+            "pre_annotations_type": None,
             "dest_annotation_type": annotation_type,
             "save_on_slice": save_on_slice,
             "on_slice_resize": on_slice_resize,
@@ -137,7 +138,7 @@ class DatasetGenerator:
             self._img_annotations = slice_cache
         else:
             self._run_detections()
-            if self._config["dest_annotation_type"] == "segment":
+            if (self._config["dest_annotation_type"] == "segment") and (self._config["pre_annotations_type"] != "segment"):
                 self._segment_on_annotations()
 
 
@@ -159,22 +160,57 @@ class DatasetGenerator:
                 logging.error(f"Generating Dataset: trying to segment objects in image {img} but its detections is None")
                 continue
             imgsz = cv2.imread(img).shape[1::-1]
-            img_boxes = img_det.xyxy.astype(np.int32)
-            class_id = img_det.class_id
+            if self._config["use_pre_annotations"] and (img in self._img_annotations) and (self._img_annotations[img] is not None):
+                img_boxes = []
+                class_id = []
+                for ann in self._img_annotations[img]:
+                    class_id.append(ann[0])
+                    # convert segment to box if any segmentation found
+                    box = ann[1:]
+                    if len(box) != 4:
+                        box = cvt.segment_to_box(box, normalized=True, imgsz=imgsz[::-1])
+                    img_boxes.append(box)
+                img_boxes = np.array(boxes)
+            else:
+                img_boxes = img_det.xyxy.astype(np.int32)
+                class_id = img_det.class_id
 
             img_masks = segmentor.segment_boxes(img, img_boxes)
             self._img_masks_cache[img] = img_masks
             img_contours = segmentor._sam2masks_to_contours(img_masks)
 
-            print(f"len(img_contours): {len(img_contours)}, len(class_id)={len(class_id)}, len(img_boxes): {len(img_boxes)}, len(img_masks): {len(img_masks)}")
             ann_contours = annotation_contours(img_contours, imgsz, det_class_id=class_id)
             contour_annotated[img] = ann_contours
+        else:
+            for img, img_ann in self._img_annotations.items():
+                imgsz = cv2.imread(img).shape
+                if img_ann is None:
+                    logging.error(f"Trying to segment from pre loaded annotations of image {img}, but its annotations are None")
+                    continue
+                boxes = []
+                class_id = []
+                for ann in img_ann:
+                    class_id.append(ann[0])
+                    # convert segment to box if any segmentation found
+                    box = ann[1:]
+                    if len(box) != 4:
+                        box = cvt.segment_to_box(box, normalized=True, imgsz=imgsz)
+                    boxes.append(box)
+                boxes = np.array(boxes)
+
+                img_masks = segmentor.segment_boxes(img, boxes)
+                self._img_masks_cache[img] = img_masks
+                img_contours = segmentor._sam2masks_to_contours(img_masks)
+                ann_contours = annotation_contours(img_contours, imgsz=imgsz[1::-1], det_class_id=class_id)
+                contour_annotated[img] = ann_contours
+
         self._img_annotations = contour_annotated
 
     def _load_annotations(self, annotations_path: str):
         self._img_annotations = get_annotation_files(self._imgs, annotations_path)
         for img in self._img_annotations:
             ann = read_dataset_annotation(self._img_annotations[img], separate_class=False)
+            self._config["pre_annotations_type"] = "box" if len(ann[1:]) == 4 else "segment"
             self._img_annotations[img] = ann
 
 
