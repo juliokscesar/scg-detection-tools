@@ -9,7 +9,7 @@ from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 import scg_detection_tools.utils.cvt as cvt
 
 def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mask=True) -> np.ndarray:
-    if binary_mask:
+    if binary_mask or (np.max(mask, axis=0) == 1):
         mask = mask * 255
     mask = mask.astype(np.uint8)
     h, w = mask.shape[:2]
