@@ -124,11 +124,13 @@ def plot_image_detection(img: Union[str, np.ndarray], boxes: Union[sv.Detections
     plot_image(annotated, cvt_to_rgb=cvt_to_rgb)
 
 def save_image_detection(default_imgpath: str,
-                         detections: sv.Detections,
+                         boxes: Union[sv.Detections, np.ndarray],
                          save_name: str,
                          save_dir: str,
                          box_thicknes: int = 1):
-    annotated = box_annotated_image(default_imgpath, detections.xyxy.astype(np.int32), box_thicknes)
+    if isinstance(boxes, sv.Detections):
+        boxes = boxes.xyxy.astype(np.int32)
+    annotated = box_annotated_image(default_imgpath, boxes, box_thicknes)
     save_image(annotated, save_name, save_dir)
 
 

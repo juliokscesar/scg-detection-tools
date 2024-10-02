@@ -8,6 +8,7 @@ import supervision as sv
 from typing import Union, Tuple
 import threading
 import queue
+import matplotlib.pyplot as plt
 
 from scg_detection_tools.detect import BaseDetectionModel, Detector
 
@@ -119,32 +120,98 @@ class SAM2Segment:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         else:
             img = img_p
-
         if len(boxes) == 0:
             return np.array([])
-    
         if not isinstance(boxes, np.ndarray):
             boxes = np.array(boxes)
+        boxes = boxes[np.lexsort((boxes[:,1],boxes[:,0]))]
 
         # If too much boxes (default 300), break in batches because it can overhead memory easily otherwise
         MASK_BATCH = 200
+
+        MAX_IMG_SIZE = (640,640)
         with torch.no_grad():
-            self._predictor.set_image(img)
-            if len(boxes) < MASK_BATCH:
-                masks, _, _ = self._predictor.predict(point_coords=None,
-                                                      point_labels=None,
-                                                      box=boxes,
-                                                      multimask_output=False)
-            else:
+            # avoid overheading memory by only getting a slice of the image to segment the mask
+            if img.shape[0] > MAX_IMG_SIZE[0] or img.shape[1] > MAX_IMG_SIZE[1]:
+                img_cuts = [] # list of [(initrow, finalrow), (inticol, finalcol)]
+                box_cuts = [] # list of (initidx, finalidx)
+                for row in range(0, img.shape[0], MAX_IMG_SIZE[0]):
+                    for col in range(0, img.shape[1], MAX_IMG_SIZE[1]):
+                        initrow = row
+                        finalrow = min(row+MAX_IMG_SIZE[0], img.shape[0])
+                        initcol = col
+                        finalcol = min(col+MAX_IMG_SIZE[1], img.shape[1])
+                        img_cuts.append([(initrow, finalrow), (initcol, finalcol)])
+
+                        BOX_X_TOLERANCE = 20
+                        BOX_Y_TOLERANCE = 20
+                        box_cut = np.where(
+                            (boxes[:,0] >= initrow) & 
+                            (boxes[:,1] >= initcol) & 
+                            (boxes[:,2] < (finalrow+BOX_X_TOLERANCE)) & 
+                            (boxes[:,3] < (finalcol+BOX_Y_TOLERANCE))
+                        )
+                        box_cuts.append(box_cut)
                 masks = []
-                for i in range(0, len(boxes), MASK_BATCH):
-                    seg_masks, _, _ = self._predictor.predict(point_coords=None,
-                                                              point_labels=None,
-                                                              box=boxes[i:(i+MASK_BATCH)],
-                                                              multimask_output=False)
-                    masks.extend(seg_masks)
+                for img_cut, box_cut in zip(img_cuts, box_cuts):
+                    (initrow,finalrow),(initcol,finalcol) = img_cut
+                    cut = img[initrow:finalrow,initcol:finalcol]
+                    cut_boxes = np.array([boxes[i] for i in box_cut])
+                    self._predictor.set_image(cut)
+                    if len(cut_boxes) < MASK_BATCH:
+                        cut_masks, _, _ = self._predictor.predict(
+                            point_coords=None,
+                            point_labels=None,
+                            box=cut_boxes,
+                            multimask_output=False,
+                        )
+                    else:
+                        cut_masks = []
+                        for i in range(0, len(cut_boxes), MASK_BATCH):
+                            batchmasks, _, _ = self._predictor.predict(
+                                point_coords=None,
+                                point_labels=None,
+                                box=cut_boxes[i:(i+MASK_BATCH)],
+                                multimask_output=False,
+                            )
+                            cut_masks.extend(batchmasks)
+                            torch.cuda.empty_cache()
+                        cut_masks = np.array(cut_masks)
+                    # fill_left = initcol
+                    # fill_top = initrow
+                    # fill_bot = img.shape[0] - finalrow
+                    # fill_right = img.shape[1] - finalcol
+                    # print(f"FILL_LEFT={fill_left}, FILL_RIGHT={fill_right}, FILL_TOP={fill_top}, FILL_BOT={fill_bot}")
+                    # masks.extend([
+                    #     cv2.copyMakeBorder(mask.astype(np.uint8).reshape[], fill_top, fill_bot, fill_left, fill_right, cv2.BORDER_CONSTANT, None) for mask in cut_masks
+                    # ])
+                    for mask in cut_masks:
+                        maskh, maskw = mask.shape[-2:]
+                        masku8 = mask.reshape(maskh,maskw,1).astype(np.uint8)
+                        full = np.zeros(shape=(img.shape[0],img.shape[1],1), dtype=np.uint8)
+                        full[initrow:finalrow,initcol:finalcol] = masku8
+                        fullh, fullw = full.shape[:2]
+                        masks.append(full.reshape(1, fullh, fullw).astype(mask.dtype))
                     torch.cuda.empty_cache()
                 masks = np.array(masks)
+
+            else:
+                self._predictor.set_image(img)
+                if len(boxes) < MASK_BATCH:
+                    masks, _, _ = self._predictor.predict(point_coords=None,
+                                                        point_labels=None,
+                                                        box=boxes,
+                                                        multimask_output=False)
+                else:
+                    masks = []
+                    for i in range(0, len(boxes), MASK_BATCH):
+                        seg_masks, _, _ = self._predictor.predict(point_coords=None,
+                                                                point_labels=None,
+                                                                box=boxes[i:(i+MASK_BATCH)],
+                                                                multimask_output=False)
+                        masks.extend(seg_masks)
+                        torch.cuda.empty_cache()
+                    masks = np.array(masks)
 
         torch.cuda.empty_cache()
         return masks
