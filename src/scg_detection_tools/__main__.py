@@ -294,7 +294,7 @@ def segment(args):
             save_image(annotated, name=f"seg{os.path.basename(img)}", dir="out")
 
 def generate(args):
-    from scg_detection_tools.generate import generate_dataset, AugmentationSteps, seg_to_box_dataset
+    from scg_detection_tools.generate import DatasetGenerator, AugmentationSteps, seg_to_box_dataset
 
     if args.convert:
         dataset_dir = args.img_source[0]
@@ -323,19 +323,29 @@ def generate(args):
             if str(aug).lower() in args.augmentations:
                 aug_steps |= aug
     
-    gen_dataset = generate_dataset(name="gen_dataset",
-                                   out_dir="gen_out",
-                                   img_files=img_files,
-                                   classes=args.data_classes,
-                                   model=model,
-                                   sam2_ckpt_path=args.sam2_ckpt,
-                                   sam2_cfg=args.sam2_cfg,
-                                   use_boxes=args.boxes,
-                                   use_segments=args.segments,
-                                   gen_on_slice=args.on_slice,
-                                   slice_detect=args.slice_detect,
-                                   imgboxes_for_segments=imgboxes,
-                                   augmentation_steps=aug_steps)
+    # TODO: adapt this cli to use new dataset generator code
+    gen_dataset = DatasetGenerator(
+        img_files=img_files,
+        class_labels=args.data_classes,
+        model=model,
+        sam2_path=args.sam2_ckpt,
+        sam2_cfg=args.sam2_cfg,
+        
+    )
+
+    # gen_dataset = generate_dataset(name="gen_dataset",
+    #                                out_dir="gen_out",
+    #                                img_files=img_files,
+    #                                classes=args.data_classes,
+    #                                model=model,
+    #                                sam2_ckpt_path=args.sam2_ckpt,
+    #                                sam2_cfg=args.sam2_cfg,
+    #                                use_boxes=args.boxes,
+    #                                use_segments=args.segments,
+    #                                gen_on_slice=args.on_slice,
+    #                                slice_detect=args.slice_detect,
+    #                                imgboxes_for_segments=imgboxes,
+    #                                augmentation_steps=aug_steps)
 
     print("FINISHED GENERATING DATASET", gen_dataset._name)
 

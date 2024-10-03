@@ -39,7 +39,6 @@ class Detector:
     def update_parameters(self, **params):
         for param in params:
             assert(param in DEFAULT_DETECTION_PARAMS)
-            assert(type(params[param]) == type(DEFAULT_DETECTION_PARAMS[param]))
             self._det_params[param] = params[param]
 
     # Returns a list of detections for every image (even for a single image)
