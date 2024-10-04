@@ -1,7 +1,11 @@
+import logging
 import supervision as sv
 from typing import Union
+import cv2
+import time
 
 from scg_detection_tools.models import BaseDetectionModel, FnEmbedSliceCallback
+from scg_detection_tools.filters import DetectionFilterDuplicates, DetectionFilterSize
 
 DEFAULT_DETECTION_PARAMS = {
         "confidence": 50.0,
@@ -14,8 +18,13 @@ DEFAULT_DETECTION_PARAMS = {
         "slice_fill": True,
         "embed_slice_callback": None,
 
-        "box_filter": False,
-        "box_filter_thresh": 0.95,
+        "detection_filters": {
+            "duplicate_filter": False,
+            "duplicate_filter_thresh": 0.95,
+
+            "object_size_filter": False,
+            "object_size_max_wh": (80,80),
+        }
 }
 
 class Detector:
@@ -67,17 +76,33 @@ class Detector:
                 slice_iou_threshold=self._det_params["slice_iou_threshold"],
                 slice_fill=self._det_params["slice_fill"],
                 embed_slice_callback=self._det_params["embed_slice_callback"],
-                box_filter=self._det_params["box_filter"],
-                box_filter_thresh=self._det_params["box_filter_thresh"],
             )
         else:
             detections = self._det_model.predict(
                 img_path=image_path,
                 confidence=self._det_params["confidence"],
                 overlap=self._det_params["overlap"],
-                box_filter=self._det_params["box_filter"],
-                box_filter_thresh=self._det_params["box_filter_thresh"],
             )
+
+        # Apply detection filters
+        if self._det_params["detection_filters"]["object_size_filter"]:
+            logging.info(f"Starting DetectionFilterSize for image {image_path}")
+            start = time.time()
+            filter = DetectionFilterSize(
+                max_obj_wh=self._det_params["detection_filters"]["object_size_max_wh"],
+            )
+            detections = filter(detections)
+            logging.info(f"Ended DetectionFilterSize for image {image_path}. Time of execution: {time.time()-start}")
+        if self._det_params["detection_filters"]["duplicate_filter"]:
+            logging.info(f"Starting DetectionFilterDuplicates for image {image_path}")
+            start = time.time()
+            filter = DetectionFilterDuplicates(
+                intersection_tresh=self._det_params["detection_filters"]["duplicate_filter_thresh"],
+                imghw=cv2.imread(image_path).shape[:2],
+            )
+            detections = filter(detections)
+            logging.info(f"Ended DetectionFilterDuplicates for image {image_path}. Time of execution: {time.time()-start}")
+        
         return detections
 
 

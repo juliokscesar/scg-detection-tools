@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Union
-
+import logging
 import numpy as np
 import cv2
 import torch
@@ -30,10 +30,8 @@ class BaseDetectionModel(ABC):
     def _underlying_model_predict(self, img_path: str, confidence: float, overlap: float) -> sv.Detections:
         pass
 
-    def predict(self, img_path: str, confidence: float, overlap: float, box_filter=False, box_filter_thresh=0.8) -> sv.Detections:        
+    def predict(self, img_path: str, confidence: float, overlap: float) -> sv.Detections:        
         detections  = self._underlying_model_predict(img_path, confidence, overlap)
-        if box_filter:
-            detections = filter_detections_xyxy(detections, intersection_thresh=box_filter_thresh)
         return detections
 
     def slice_predict(self, 
@@ -44,8 +42,6 @@ class BaseDetectionModel(ABC):
                       slice_overlap_ratio: tuple,
                       slice_iou_threshold: float,
                       slice_fill=True,
-                      box_filter=False,
-                      box_filter_thresh: float = 0.8,
                       embed_slice_callback: Callable[[str, np.ndarray, str, np.ndarray], None] = None) -> sv.Detections:
         def sv_slice_callback(image: np.ndarray) -> sv.Detections:
             # Check if slice is smaller than the desired
@@ -81,10 +77,7 @@ class BaseDetectionModel(ABC):
                                     overlap_ratio_wh=slice_overlap_ratio,
                                     iou_threshold=slice_iou_threshold)
         sliced_detections = slicer(image=img)
-        if box_filter:
-            sliced_detections = filter_detections_xyxy(sliced_detections, intersection_thresh=box_filter_thresh)
         return sliced_detections
-
 
     @abstractmethod
     def train(self, 
@@ -228,57 +221,3 @@ def from_type(model_type: str, model_path: str, data_classes = ["leaf"], yolonas
         return YOLO_NAS(yolonas_arch, model_path, data_classes)
     else:
         raise NotImplemented()
-
-def filter_detections_xyxy(detections: sv.Detections, intersection_thresh: float = 0.9):
-    """ 
-    Filter possible duplicates in detection boxes by calculating their area of intersection and comparing that over the area of the smallest one of the boxes.
-    If intersection >= min(Area) * intersection_thresh, the smallest box is considered to be a duplicate and gets removed.
-    """
-    remove = []
-    boxes = detections.xyxy
-    for i in range(len(boxes)):
-        # Skip index if already to be removed
-        if i in remove:
-            continue
-
-        for j in range(i+1, len(boxes)):
-            # Skip index if already to be removed
-            if j in remove:
-                continue
-
-            # Find a intersection box
-            x_a1, y_a1, x_a2, y_a2 = boxes[i]
-            x_b1, y_b1, x_b2, y_b2 = boxes[j]
-            inter_x1 = max(x_a1, x_b1)
-            inter_y1 = max(y_a1, y_b1)
-            inter_x2 = min(x_a2, x_b2)
-            inter_y2 = min(y_a2, y_b2)
-            # Skip if no intersection
-            if not ((inter_x1 < inter_x2) and (inter_y1 < inter_y2)):
-                continue
-            inter_area = (inter_x2 - inter_x1) * (inter_y2 - inter_y1)
-
-            # Take smallest box
-            small_idx = small_area = 1.9e+9
-            for box_idx in [i, j]:
-                box_area = (boxes[box_idx][2] - boxes[box_idx][0]) * (boxes[box_idx][3] - boxes[box_idx][1])
-                if box_area < small_area:
-                    small_area = box_area
-                    small_idx = box_idx
-
-            # If intersection is bigger or equal to the given percentage of the smallest area, remove box
-            if inter_area >= (small_area * intersection_thresh):
-                remove.append(small_idx)
-    if len(remove) == 0:
-        return detections
-    # Sort in reverse order so it is safe to delete them all from the boxes
-    remove = sorted(remove, reverse=True)
-    box_classes = detections.class_id
-    box_confidence = detections.confidence
-    for idx in remove:
-        boxes = np.delete(boxes, idx, axis=0)
-        box_classes = np.delete(box_classes, idx)
-        box_confidence = np.delete(box_confidence, idx)
-    new_det = sv.Detections(xyxy=boxes, class_id=box_classes, confidence=box_confidence)
-    return new_det
-
