@@ -111,7 +111,7 @@ class DatasetGenerator:
                     if on_slice_resize is not None:
                         # there is no need to rescale boxes because they are in relative coordinates
                         slice_img = cv2.resize(slice_img, on_slice_resize, interpolation=cv2.INTER_CUBIC)
-                    cv2.imwrite(slice_path, slice_img)
+                    cv2.imwrite(slice_path, cv2.cvtColor(slice_img, cv2.COLOR_RGB2BGR))
                     slice_annotations = annotation_boxes(det_boxes, imgsz=sliceimg.shape[1::-1])
                     slice_cache[slice_path] = slice_annotations
                 self._detector.detect_objects(self._imgs, slice_detect=True, embed_slice_callback=_save_on_slice)
@@ -132,7 +132,7 @@ class DatasetGenerator:
                         slicesz = slice_img.shape[1::-1]
                         if on_slice_resize is not None:
                             slice_img = cv2.resize(slice_img, on_slice_resize, interpolation=cv2.INTER_CUBIC)
-                        cv2.imwrite(slice_path, slice_img)
+                        cv2.imwrite(slice_path, cv2.cvtColor(slice_img, cv2.COLOR_RGB2BGR))
                         slice_ann = annotation_contours(slice["contours"], imgsz=slicesz)
                         slice_cache[slice_path] = slice_ann
             self._img_annotations = slice_cache
