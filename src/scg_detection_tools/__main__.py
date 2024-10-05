@@ -330,7 +330,6 @@ def generate(args):
         model=model,
         sam2_path=args.sam2_ckpt,
         sam2_cfg=args.sam2_cfg,
-        
     )
 
     # gen_dataset = generate_dataset(name="gen_dataset",
