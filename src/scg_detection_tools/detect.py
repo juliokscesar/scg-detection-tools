@@ -48,7 +48,12 @@ class Detector:
     def update_parameters(self, **params):
         for param in params:
             assert(param in DEFAULT_DETECTION_PARAMS)
-            self._det_params[param] = params[param]
+            if isinstance(params[param], dict):
+                for key in params[param]:
+                    assert(key in self._det_params[param])
+                    self._det_params[param][key] = params[param][key]
+            else:
+                self._det_params[param] = params[param]
 
     # Returns a list of detections for every image (even for a single image)
     def detect_objects(self, img: Union[list, str], **diff_det_params) -> list:

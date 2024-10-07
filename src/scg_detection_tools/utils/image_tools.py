@@ -4,9 +4,71 @@ import cv2
 import matplotlib.pyplot as plt
 from typing import Union, Tuple, List
 import os
+from copy import deepcopy
 
 from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 import scg_detection_tools.utils.cvt as cvt
+
+def apply_image_mask(img: Union[str, np.ndarray], binary_mask: np.ndarray, color: np.ndarray = None, alpha: float = 0.6, bounding_box: np.ndarray = None) -> np.ndarray:
+    """ 
+    Apply a mask over an image with specified color and alpha value.
+    'binary_mask' must have shape (height, width, 1) with 1s where the object is and 0s otherwise.
+    If 'color' provided is None, will use a 'deepskyblue' like color.
+    If a 'bounding_box' is provided, binary_mask must have same height and width as the bounding box, and the mask will be applied in the location of the bounding box on the image.
+    """
+    if isinstance(img, str):
+        img = cv2.imread(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    assert(img.shape[2] == 3)
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
+    img[:,:,3] = 255
+
+    if color is None:
+        color = np.array([255, 0, 255]) # Magenta
+
+    masked_img = deepcopy(img)
+
+    if bounding_box is not None:
+        x1, y1, x2, y2 = bounding_box
+        boxw = x2 - x1
+        boxh = y2 - y1
+        maskh = binary_mask.shape[0]
+        maskw = binary_mask.shape[1]
+        mask = binary_mask.copy()
+        # Take only the part surrounded by the box if the mask is bigger than the box.
+        if (maskh > boxh) and (maskw > boxw):
+            mask = mask[0:boxh,0:boxw]
+        elif (boxh > maskh) and (boxw > boxh):
+            padh = min(0, boxh - maskh)
+            padw = min(0, boxw - maskw)
+            print("PADH, PADW:", padh, padw)
+            mask = np.pad(mask, ((0,padh), (0,padw)), mode="constant", constant_values=0)
+    
+        # Apply mask on crop
+        img_crop = crop_box_image(masked_img, bounding_box)
+        # Make mask RGBA with color and alpha
+        mask = mask * 255
+        mask = mask * np.concatenate((color, [alpha])).reshape(1, 1, -1)
+
+        alpha_crop = img_crop[:,:,3] / 255.0
+        alpha_mk = mask[:,:,3] / 255.0
+        
+        for c in range(3):
+            img_crop[:,:,c] = alpha_mk * mask[:,:,c] + alpha_crop * img_crop[:,:,c] * (1 - alpha_mk)
+
+        masked_img[y1:y2,x1:x2] = img_crop
+
+    else:
+        assert(img.shape[:2] == binary_mask.shape[:2])
+        mask = binary_mask.copy()
+        mask = (mask * 255) * np.concatenate((color, [alpha])).reshape(1,1,-1)
+        alpha_img = masked_img[:,:,3] / 255.0
+        alpha_mk = mask[:,:,3] / 255.0
+        for c in range(3):
+            masked_img[:,:,c] = alpha_mk * mask[:,:,c] + alpha_img * masked_img[:,:,c] * (1 - alpha_mk)
+
+    return cv2.cvtColor(masked_img, cv2.COLOR_RGBA2RGB)
+
 
 def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mask=True) -> np.ndarray:
     if binary_mask or (np.max(mask, axis=0) == 1):
@@ -17,13 +79,10 @@ def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mas
     return mask_img
 
 def box_annotated_image(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_thickness: int = 1) -> np.ndarray:
-    # box_annotator = sv.BoxAnnotator(thickness=box_thickness)
     if isinstance(img, str):
         img = cv2.imread(img)
     if isinstance(boxes, sv.Detections):
         boxes = boxes.xyxy.astype(np.int32)
-    # annotated_img = box_annotator.annotate(scene=img,
-    #                                        detections=detections)
     annotated_img = img.copy()
     BOX_COLOR = [255, 0, 255] # magenta
     for box in boxes:
@@ -110,9 +169,10 @@ def crop_box_image(img: Union[np.ndarray, str],
                    box_xyxy: np.ndarray):
     if isinstance(img, str):
         img = cv2.imread(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     row0, col0, row1, col1 = box_xyxy
-    return img[col0:(col1+1), row0:(row1+1)]
+    return img[col0:col1, row0:row1]
 
 def plot_image_detection(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_thickness: int = 1, cvt_to_rgb=True):
     if isinstance(img, str):

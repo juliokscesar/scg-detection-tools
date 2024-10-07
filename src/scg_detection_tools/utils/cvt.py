@@ -54,16 +54,19 @@ def contours_to_masks(contours: list, imgsz: Tuple[int, int], normalized=True, b
     return masks
 
 
-def boxes_to_masks(boxes: np.ndarray, imgsz: Tuple[int], normalized=False):
+def boxes_to_masks(boxes: np.ndarray, imghw: Tuple[int], normalized=False, binary_mask=False):
     masks = []
     for box in boxes:
         x1, y1, x2, y2 = box
-        points = np.array([[x1,y1], [x2,y1], [x2, y2], [x1, y2]])
+        points = np.array([[[x1,y1], [x2,y1], [x2, y2], [x1, y2]]], dtype=np.int32)
         if normalized:
-            points = np.int32(points * np.array(imgsz[::-1]))
+            points = np.int32(points * np.array(imghw))
 
-        maskimg = np.zeros(imgsz, dtype=np.uint8)
-        cv2.fillPoly(maskimg, [points], color=255)
+        maskimg = np.zeros(imghw, dtype=np.uint8)
+        cv2.fillPoly(maskimg, points, color=255)
+        if binary_mask:
+            maskimg = maskimg // 255
+        maskimg = maskimg.reshape((maskimg.shape[0],maskimg.shape[1],1)).astype(np.uint8)
         masks.append(maskimg)
 
     return masks

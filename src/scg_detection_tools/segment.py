@@ -105,7 +105,7 @@ class SAM2Segment:
         return result
 
 
-    def _segment_point(self, img_p: Union[str, np.ndarray], input_points: np.ndarray, input_labels: np.ndarray):
+    def segment_point(self, img_p: Union[str, np.ndarray], input_points: np.ndarray, input_labels: np.ndarray):
         if isinstance(img_p, str):
             img = cv2.imread(img_p)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -136,7 +136,6 @@ class SAM2Segment:
             return np.array([])
         if not isinstance(boxes, np.ndarray):
             boxes = np.array(boxes)
-        boxes = boxes[np.lexsort((boxes[:,1],boxes[:,0]))]
 
         # If too much boxes (default 300), break in batches because it can overhead memory easily otherwise
         MASK_BATCH = 200
