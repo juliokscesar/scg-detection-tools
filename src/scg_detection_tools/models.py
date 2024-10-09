@@ -85,7 +85,8 @@ class BaseDetectionModel(ABC):
               epochs=30, 
               batch=8, 
               device: Union[list, str, int] = "cpu", 
-              workers=6):
+              workers=6,
+              patience=20):
         pass
 
 
@@ -111,12 +112,13 @@ class YOLOv8(BaseDetectionModel):
               epochs=30, 
               batch=8, 
               device: Union[list, str, int] = "cpu", 
-              workers=6):
+              workers=6,
+              patience=20):
         data_yaml = os.path.join(dataset_dir, "data.yaml")
         if not file_exists(data_yaml):
             raise FileExistsError(f"No 'data.yaml' found in dataset directory {dataset_dir}")
 
-        results = self._underlying_model.train(data=data_yaml, imgsz=640, epochs=epochs, batch=batch, device=device, workers=workers, patience=int(0.4*epochs))
+        results = self._underlying_model.train(data=data_yaml, imgsz=640, epochs=epochs, batch=batch, device=device, workers=workers, patience=patience)
         return results
 
 
@@ -147,7 +149,8 @@ class YOLO_NAS(BaseDetectionModel):
               epochs=30, 
               batch=8, 
               device: Union[list, str, int] = "cpu", 
-              workers=6):
+              workers=6,
+              patience=None):
         from scg_detection_tools.utils.yolonas_train import train_yolo_nas
 
         if not file_exists(os.path.join(dataset_dir, "data.yaml")):

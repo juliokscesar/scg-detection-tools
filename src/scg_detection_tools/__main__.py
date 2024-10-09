@@ -187,6 +187,7 @@ type=float,
     train_parser.add_argument("--batch", type=int, default=4, help="Data batch size. Default is 4")
     train_parser.add_argument("--workers", type=int, default=2, help="Workers to do training. Default is 2")
     train_parser.add_argument("--device", nargs="+", help="Device to train on. Can be 'cpu', 0 to use first CUDA device, 1 for second, 0,1 for both, etc")
+    train_parser.add_argument("--patience", type=int, default=30, help="Patience value. If no improvement has been made to the model in this number of epochs, stop the training")
 
 
 
@@ -376,7 +377,8 @@ def train(args):
                 epochs=args.epochs,
                 batch=args.batch,
                 device=device,
-                workers=args.workers)
+                workers=args.workers,
+                patience=args.patience)
 
 
 def main():
