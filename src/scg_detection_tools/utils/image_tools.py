@@ -133,17 +133,19 @@ def plot_image(img: np.ndarray, cvt_to_rgb=True):
     plt.axis("off")
     plt.show()
 
-def save_image(img: np.ndarray, name: str, dir: str = "exp", cvt_to_bgr=False, notify_save=False):
+def save_image(img: np.ndarray, name: str, dir: Union[str, None] = None, cvt_to_bgr=False, notify_save=False):
     if cvt_to_bgr:
         if img.shape[:-1] == 4:
             img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
         elif img.shape[:-1] == 3:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     
-    if not os.path.isdir(dir):
-        os.makedirs(dir, exist_ok=True)
-
-    out_file = os.path.join(dir, name)
+    if isinstance(dir, str):
+        if not os.path.isdir(dir):
+            os.makedirs(dir, exist_ok=True)
+        out_file = os.path.join(dir, name)
+    else:
+        out_file = name
     cv2.imwrite(out_file, img)
     
     if notify_save:
@@ -270,3 +272,11 @@ def create_annotation_batch(imgs: Union[List[np.ndarray], List[str]], imgsz: Tup
                     
 
     return batches, batch_contours
+
+
+def apply_contrast_brightness(img: Union[str, np.ndarray], contrast_ratio: float = 1.0, brightness_delta: int = 0) -> np.ndarray:
+    if isinstance(img, str):
+        img = cv2.imread(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    altered = cv2.convertScaleAbs(img, alpha=contrast_ratio, beta=brightness_delta)
+    return altered

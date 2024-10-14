@@ -12,6 +12,8 @@ def generete_temp_path(suffix: str) -> str:
     return os.path.join(".temp", os.urandom(24).hex()+suffix)
 
 def clear_temp_folder():
+    if not os.path.isdir(".temp"):
+        return
     try:
         shutil.rmtree(".temp")
     except:

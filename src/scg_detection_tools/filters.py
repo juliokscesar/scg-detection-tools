@@ -56,7 +56,6 @@ class DetectionFilterDuplicates(DetectionsFilter):
                     inter_y1 = max(y1, other_y1)
                     inter_x2 = min(x2, other_x2)
                     inter_y2 = min(y2, other_y2)
-                    # skip if no intersection
 
                     # Get smallest area of the boxes and compare with the intersection area
                     inter_area = (inter_x2 - inter_x1) * (inter_y2 - inter_y1)

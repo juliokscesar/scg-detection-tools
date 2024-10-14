@@ -3,9 +3,13 @@ import supervision as sv
 from typing import Union
 import cv2
 import time
+import os
 
 from scg_detection_tools.models import BaseDetectionModel, FnEmbedSliceCallback
 from scg_detection_tools.filters import DetectionFilterDuplicates, DetectionFilterSize
+from scg_detection_tools.preprocess import ImagePreprocess, ImagePreprocessPipeline
+import scg_detection_tools.utils.image_tools as imtools
+from scg_detection_tools.utils.file_handling import generete_temp_path
 
 DEFAULT_DETECTION_PARAMS = {
         "confidence": 50.0,
@@ -24,7 +28,13 @@ DEFAULT_DETECTION_PARAMS = {
 
             "object_size_filter": False,
             "object_size_max_wh": (80,80),
-        }
+        },
+
+        "enable_image_preprocess": False,
+        "image_preprocess": { 
+            "apply_to_ratio": 1.0,
+            "parameters": {"contrast_ratio": 1.0,"brightness_delta": 0} ,
+        },
 }
 
 class Detector:
@@ -38,6 +48,14 @@ class Detector:
                     detection_params[key] = DEFAULT_DETECTION_PARAMS[key]
         self._det_params = detection_params
         
+        if self._det_params["enable_image_preprocess"]:
+            self._det_preprocess = ImagePreprocessPipeline(preprocess_steps=[
+                ImagePreprocess(
+                    preproc_func=imtools.apply_contrast_brightness, 
+                    **self._det_params["image_preprocess"]["parameters"],
+                )
+            ])
+
         if specific_det_params is not None:
             for spec_det_param in specific_det_params:
                 self._det_params[spec_det_param] = specific_det_params[spec_det_param]
@@ -70,6 +88,12 @@ class Detector:
             raise ValueError("'img' argument must be either a string or a list of strings")
 
     def _detect_single_image(self, image_path: str) -> sv.Detections:
+        if self._det_params["enable_image_preprocess"]:
+            proc = self._det_preprocess(image_path)
+            temp = generete_temp_path(suffix=os.path.splitext(image_path)[1])
+            imtools.save_image(proc, temp, cvt_to_bgr=True)
+            image_path = proc
+
         slice_detect = self._det_params["slice_detect"]
         if slice_detect:
             detections = self._det_model.slice_predict(
