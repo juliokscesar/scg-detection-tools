@@ -1,3 +1,4 @@
+import logging
 import supervision as sv
 import numpy as np
 import cv2
@@ -119,7 +120,10 @@ def contour_annotated_image(img: Union[str, np.ndarray], contour: np.ndarray, co
     return segment_annotated_image(img, mask, color, alpha)
 
 
-def plot_image(img: np.ndarray, cvt_to_rgb=True):
+def plot_image(img: Union[np.ndarray,str], cvt_to_rgb=True):
+    if isinstance(img, str):
+        img = cv2.imread(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     if img.ndim == 2:
         plt.imshow(img, cmap="gray")
     elif cvt_to_rgb:
@@ -280,3 +284,52 @@ def apply_contrast_brightness(img: Union[str, np.ndarray], contrast_ratio: float
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     altered = cv2.convertScaleAbs(img, alpha=contrast_ratio, beta=brightness_delta)
     return altered
+
+
+COLOR_SPACES_CV2 = {
+    "RGB": None, 
+    "BGR": cv2.COLOR_RGB2BGR,
+    "HSV": cv2.COLOR_RGB2HSV, 
+    "GRAY": cv2.COLOR_RGB2GRAY, 
+    "LAB": cv2.COLOR_RGB2Lab, 
+    "LUV": cv2.COLOR_RGB2Luv, 
+    "YUV": cv2.COLOR_RGB2YUV, 
+    "YCRCB": cv2.COLOR_RGB2YCrCb,
+}
+def convert(img: Union[str, np.ndarray], to_cspace: str) -> np.ndarray:
+        if isinstance(img, np.ndarray):
+            logging.info("We assume RGB format on np.ndarray images")
+        else:
+            img = cv2.imread(img)
+            if img is None:
+                logging.fatal(f"Couldn't load image {img}")
+                return None
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        to_cspace = to_cspace.strip().upper()
+        if to_cspace not in COLOR_SPACES_CV2:
+            raise ValueError(f"to_cspace must be one of {', '.join(COLOR_SPACES_CV2)}")
+    
+        if to_cspace == "RGB":
+            return img
+        
+        cvt = cv2.cvtColor(img, COLOR_SPACES_CV2[to_cspace])
+        return cvt
+
+def histogram(img: Union[str, np.ndarray], masks: np.ndarray = None) -> np.ndarray:
+    if isinstance(img, str):
+        img = cv2.imread(img)
+    
+    channels = list(range(img.shape[-1])) if img.ndim == 3 else [0]
+    hist = np.zeros(shape=(len(channels), 256))
+    if masks is not None:
+        for mask in masks:
+            for c in channels:
+                h = cv2.calcHist([img], [c], mask, [256], [0,256])
+                hist[c] = hist[c] + h.reshape(256)
+    else: # no masks
+        for c in channels:
+            h = cv2.calcHist([img], [c], None, [256], [0,256])
+            hist[c] = h.reshape(256)
+
+    return hist    

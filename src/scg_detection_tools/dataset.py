@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import logging
 import shutil
-from typing import Tuple, List
+from typing import Tuple, List, Union
 import numpy as np
 import yaml
 import cv2
@@ -66,6 +66,29 @@ class Dataset:
         data_img = {"image": img_path, "annotations": ann_file}
         self._data[mode].append(data_img)
 
+    def remove(self, index: Union[str, int], mode: str = "train"):
+        if mode not in self._data:
+            raise ValueError("Argument 'mode' must 'train', 'val' or 'test'")
+        # Get image data index if img is string
+        if isinstance(index, str):
+            for i in range(len(self._data[mode])):
+                if self._data[mode][i]["image"] == index:
+                    index = i
+                    break
+        # check again if index is still a string
+        if index >= len(self._data[mode]) or isinstance(index, str):
+            print(f"len(self._data[mode])={len(self._data[mode])}, index={index}, type(index)={type(index)}, isint={isinstance(index,int)}")
+            raise ValueError("'index' must be either the image full path or the index to that image in the mode data list")
+        index_data = self._data[mode][index]
+
+        # Delete image and annotation files if in dataset folder
+        for keyfile in index_data:
+            if file_exists(os.path.join(self._dataset_dir, os.path.basename(index_data[keyfile]))):
+                os.remove(os.path.join(self._dataset_dir, os.path.basename(index_data[keyfile])))
+        
+        # Finally delete item from self._data and return removed
+        return self._data[mode].pop(index)
+
     def load(self):
         dataset_yaml = os.path.join(self._dataset_dir, "data.yaml")
         if not file_exists(dataset_yaml):
@@ -107,12 +130,14 @@ class Dataset:
                 data["image"] = img_path
                 data["annotations"] = ann_path
 
-        print(f"Dataset {self._name}: saved images and annotations to {self._dataset_dir}. Remember to clean .temp folder")
-
         # Save data.yaml
         with open(os.path.join(self._dataset_dir, "data.yaml"), "w") as f:
             yaml.dump(self._dataset, f)
 
+    def len_data(self, mode: Union[str,None] = None):
+        if mode is None:
+            return sum([len(self._data[m]) for m in self._data])
+        return len(self._data[mode])
     
     def get_data(self, mode="train"):
         """ Return stored data as a list of dictionaries being: {"image": img_path, "annotation": ann_path} """
@@ -162,6 +187,7 @@ class Dataset:
 
             self._data[dest].append(data)
 
+    
 
 
 def read_dataset_annotation(ann_file: str, separate_class=True):

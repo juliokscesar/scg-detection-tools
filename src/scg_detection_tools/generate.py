@@ -14,7 +14,7 @@ from scg_detection_tools.detect import Detector
 from scg_detection_tools.dataset import Dataset, read_dataset_annotation
 import scg_detection_tools.utils.cvt as cvt
 from scg_detection_tools.utils.image_tools import save_image, create_annotation_batch
-from scg_detection_tools.utils.file_handling import get_annotation_files
+from scg_detection_tools.utils.file_handling import get_annotation_files, clear_temp_folder
 
 
 class AugmentationSteps(Flag):
@@ -46,6 +46,7 @@ class DatasetGenerator:
             save_on_slice = False,
             on_slice_resize: Union[Tuple[int,int], None] = None,
             augmentation_steps: AugmentationSteps = None,
+            keep_ratio: float = 1.0,
         ):
         self._imgs = img_files
         self._img_annotations = { img: None for img in self._imgs }
@@ -64,6 +65,9 @@ class DatasetGenerator:
         self._img_detections_cache = { img: None for img in self._imgs }
         self._img_masks_cache = { img: None for img in self._imgs }
 
+        if not 0.0 <= keep_ratio <= 1.0:
+            raise ValueError("Argument keep_ratio must be between 0 and 1")
+
         self._config = {
             "use_pre_annotated": (pre_annotations_path is not None),
             "pre_annotations_type": None,
@@ -74,6 +78,7 @@ class DatasetGenerator:
             "sam2_cfg": sam2_cfg,
             "augmentation_steps": augmentation_steps,
             "detection_parameters": self._detector._det_params,
+            "keep_ratio": keep_ratio,
         }
 
         if dataset_name is None:
@@ -93,11 +98,22 @@ class DatasetGenerator:
                 continue
             self._gen_dataset.add(img_path=img, annotations=img_annotations)
 
+        if self._config["keep_ratio"] < 1.0:
+            rng = np.random.default_rng()
+            remove_size = int(self._gen_dataset.len_data(mode="train") * (1.0 - self._config["keep_ratio"]))
+            remove_indices = rng.choice(self._gen_dataset.len_data(mode="train"), size=remove_size, replace=False)
+            remove_indices = sorted(remove_indices, reverse=True)
+
+            logging.info(f"Drroping {remove_size} images from generated dataset")
+            for i in remove_indices:
+                self._gen_dataset.remove(i, mode="train")
+
         if save_on_finish:
             self.save()
 
     def save(self):
         self._gen_dataset.save()
+        clear_temp_folder()
 
     def _annotate_images(self):
         if self._config["save_on_slice"]:
@@ -212,8 +228,6 @@ class DatasetGenerator:
             ann = read_dataset_annotation(self._img_annotations[img], separate_class=False)
             self._config["pre_annotations_type"] = "box" if len(ann[1:]) == 4 else "segment"
             self._img_annotations[img] = ann
-
-
             
 def augment_steps(steps: AugmentationSteps, imgs: List[str], annotations: List[List[np.ndarray]], augment_ratio=0.3, blur_sigma=5, sharpen_sigma=5, num_batches=5):
     if AugmentationSteps.NONE in steps:
