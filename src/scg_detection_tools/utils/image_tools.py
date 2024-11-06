@@ -297,9 +297,7 @@ COLOR_SPACES_CV2 = {
     "YCRCB": cv2.COLOR_RGB2YCrCb,
 }
 def convert(img: Union[str, np.ndarray], to_cspace: str) -> np.ndarray:
-        if isinstance(img, np.ndarray):
-            logging.info("We assume RGB format on np.ndarray images")
-        else:
+        if not isinstance(img, np.ndarray):
             img = cv2.imread(img)
             if img is None:
                 logging.fatal(f"Couldn't load image {img}")
