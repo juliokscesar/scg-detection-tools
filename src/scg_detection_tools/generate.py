@@ -234,7 +234,7 @@ def augment_steps(steps: AugmentationSteps, imgs: List[str], annotations: List[L
         return None
     
     aug_size = int(len(imgs) * augment_ratio) 
-    idx_choices = np.random.choice(len(imgs), size=aug_size)
+    idx_choices = np.random.choice(len(imgs), size=aug_size, replace=False)
     using_imgs = []
     using_annotations = []
     for idx in idx_choices:

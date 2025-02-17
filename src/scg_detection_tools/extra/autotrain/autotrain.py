@@ -75,7 +75,7 @@ def main():
     print(f"FINISHED GENERATING DATASET {gen_dt._name}")
 
     gen_dt.split_modes(src="train", dest="val", ratio=0.1)
-    gen_dt.split_modes(src="train", dest="test", ratio=0.01)
+    gen_dt.split_modes(src="train", dest="test", ratio=0.05)
     gen_dt.save()
 
     train_result = model.train(dataset_dir=os.path.abspath(gen_dt.directory),

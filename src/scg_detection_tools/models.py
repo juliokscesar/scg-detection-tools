@@ -46,11 +46,10 @@ class BaseDetectionModel(ABC):
         def sv_slice_callback(image: np.ndarray) -> sv.Detections:
             # Check if slice is smaller than the desired
             # if so, then fills to the right and to bottom with black pixels
-            # to get, but without changing the original pixels coordinates
             sliceimg = image.copy()
             if slice_fill:
                 h, w = sliceimg.shape[:2]
-                sh, sw = slice_wh
+                sw, sh = slice_wh
                 bot_fill = sh - h
                 right_fill = sw - w
                 if bot_fill or right_fill:
