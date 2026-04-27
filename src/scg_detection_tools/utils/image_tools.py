@@ -3,9 +3,10 @@ import supervision as sv
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from typing import Union, Tuple, List
+from typing import Union, Tuple, List, Optional
 import os
 from copy import deepcopy
+import hashlib
 
 from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 import scg_detection_tools.utils.cvt as cvt
@@ -79,17 +80,181 @@ def mask_img_alpha(mask: np.ndarray, color: np.ndarray, alpha: float, binary_mas
     mask_img = mask.reshape(h,w,1) * np.concatenate((color, [alpha])).reshape(1,1,-1)
     return mask_img
 
-def box_annotated_image(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_thickness: int = 1) -> np.ndarray:
+def box_annotated_image(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_thickness: int = 1, box_colors: Optional[List[List[int]]] = None) -> np.ndarray:
     if isinstance(img, str):
         img = cv2.imread(img)
     if isinstance(boxes, sv.Detections):
         boxes = boxes.xyxy.astype(np.int32)
     annotated_img = img.copy()
-    BOX_COLOR = [255, 0, 255] # magenta
-    for box in boxes:
+    for i, box in enumerate(boxes):
         x1, y1, x2, y2 = box
-        annotated_img = cv2.rectangle(annotated_img, (x1, y1), (x2, y2), color=BOX_COLOR, thickness=box_thickness)
+        annotated_img = cv2.rectangle(
+            annotated_img, 
+            (x1, y1), 
+            (x2, y2), 
+            color=box_colors[i] if box_colors else [255,0,255], 
+            thickness=box_thickness
+        )
     return annotated_img
+
+def annotate_classes(
+    img: Union[str, np.ndarray],
+    boxes_xyxy: np.ndarray,
+    classes: List[str],
+    text_color: List[int] = [0, 0, 0],
+    bg_color: dict[str,List[int]] = None,
+    font_scale: float = 0.5,
+    thickness: int = 1,
+):
+    if isinstance(img, str):
+        img = cv2.imread(img)
+
+    annotated_img = img.copy()
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    for box, label in zip(boxes_xyxy, classes):
+        x1, y1, x2, y2 = map(int, box)
+
+        # Get text size
+        (text_w, text_h), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+
+        # Define rectangle coordinates (above the box)
+        rect_x1 = x1
+        rect_y2 = y1
+        rect_y1 = y1 - text_h - baseline - 4  # padding
+
+        # If rectangle goes above image, push it inside
+        if rect_y1 < 0:
+            rect_y1 = 0
+            rect_y2 = text_h + baseline + 4
+
+        rect_x2 = rect_x1 + text_w + 4  # padding
+
+        # Draw filled rectangle
+        cv2.rectangle(
+            annotated_img,
+            (rect_x1, rect_y1),
+            (rect_x2, rect_y2),
+            bg_color[label] if bg_color is not None else [255,0,255],
+            thickness=-1
+        )
+
+        # Put text
+        text_x = rect_x1 + 2
+        text_y = rect_y2 - baseline - 2
+
+        cv2.putText(
+            annotated_img,
+            label,
+            (text_x, text_y),
+            font,
+            font_scale,
+            text_color,
+            thickness,
+            lineType=cv2.LINE_AA
+        )
+
+    return annotated_img
+
+def annotate_box_size(
+    img: Union[str, np.ndarray],
+    boxes_xyxy: np.ndarray,
+    font_scale: float = 0.5,
+    thickness: int = 1,
+):
+    if isinstance(img, str):
+        img = cv2.imread(img)
+
+    annotated_img = img.copy()
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    for box in boxes_xyxy:
+        x1, y1, x2, y2 = map(int, box)
+
+        width = x2 - x1
+        height = y2 - y1
+
+        text_w = f"{width}px"
+        text_h = f"{height}px"
+
+        # --- TEXT BELOW (width) ---
+        (tw_w, tw_h), tw_base = cv2.getTextSize(text_w, font, font_scale, thickness)
+        text_x_w = x1 + (width - tw_w) // 2
+        text_y_w = y2 + tw_h + 4
+
+        # Keep inside image
+        text_y_w = min(text_y_w, annotated_img.shape[0] - 2)
+
+        # --- TEXT LEFT (height) ---
+        (th_w, th_h), th_base = cv2.getTextSize(text_h, font, font_scale, thickness)
+        text_x_h = x1 - th_w - 4
+        text_y_h = y1 + (height + th_h) // 2
+
+        # Keep inside image
+        text_x_h = max(text_x_h, 0)
+
+        # --- DRAW WITH OUTLINE FUNCTION ---
+        def draw_text_with_outline(img, text, org):
+            # Black outline
+            cv2.putText(
+                img, text, org, font, font_scale,
+                (0, 0, 0), thickness + 2, cv2.LINE_AA
+            )
+            # White text
+            cv2.putText(
+                img, text, org, font, font_scale,
+                (255, 255, 255), thickness, cv2.LINE_AA
+            )
+
+        draw_text_with_outline(annotated_img, text_w, (text_x_w, text_y_w))
+        draw_text_with_outline(annotated_img, text_h, (text_x_h, text_y_h))
+
+    return annotated_img
+    
+
+def generate_class_colors(unique_classes):
+    def class_to_color(cls_name):
+        # Hash → stable integer
+        h = hashlib.md5(cls_name.encode()).hexdigest()
+        hue = int(h[:4], 16) % 180  # map to HSV hue range [0,179]
+
+        # Fixed saturation/value for good visibility
+        color_hsv = np.uint8([[[hue, 200, 255]]])
+        color_bgr = cv2.cvtColor(color_hsv, cv2.COLOR_HSV2BGR)[0, 0]
+        color_rgb = color_bgr[::-1]
+
+        return color_rgb.tolist()
+
+    return {cls: class_to_color(cls) for cls in unique_classes}
+
+def annotate_image_detection(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_classes: Optional[List[str]] = None, box_thickness: int = 1, cvt_to_rgb=True, display_size=False):
+    if isinstance(img, str):
+        img = cv2.imread(img)
+    
+    if isinstance(boxes, sv.Detections):
+        boxes = boxes.xyxy.astype(np.int32)
+    
+    if box_classes is not None:
+        # we are also showing each class here
+        unique_classes = set(box_classes)
+        class_colors = generate_class_colors(unique_classes)
+        
+        box_colors = [class_colors[label] for label in box_classes]
+        
+        print("boxes len:", len(boxes))
+        print("classes len:", len(box_classes))
+        print("box colors len:", len(box_colors))
+        
+        box_annotated = box_annotated_image(img, boxes, box_colors=box_colors)
+        annotated = annotate_classes(box_annotated, boxes, box_classes, bg_color=class_colors)
+    else:
+        annotated = box_annotated_image(img, boxes, box_thickness=box_thickness)
+        
+    if display_size:
+        annotated = annotate_box_size(annotated, boxes)
+        
+    return annotated
 
 def segment_annotated_image(default_img: Union[str,np.ndarray], mask: np.ndarray, color: np.ndarray, alpha: float) -> np.ndarray:
     if isinstance(default_img, str):
@@ -180,23 +345,22 @@ def crop_box_image(img: Union[np.ndarray, str],
     row0, col0, row1, col1 = box_xyxy
     return img[col0:col1, row0:row1]
 
-def plot_image_detection(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_thickness: int = 1, cvt_to_rgb=True):
-    if isinstance(img, str):
-        img = cv2.imread(img)
-    
-    if isinstance(boxes, sv.Detections):
-        boxes = boxes.xyxy.astype(np.int32)
-    annotated = box_annotated_image(img, boxes, box_thickness=box_thickness)
+def plot_image_detection(img: Union[str, np.ndarray], boxes: Union[sv.Detections, np.ndarray], box_classes: Optional[List[str]] = None, box_thickness: int = 1, cvt_to_rgb=True, display_size=False):
+    annotated = annotate_image_detection(img, boxes, box_classes, box_thickness, cvt_to_rgb, display_size)    
     plot_image(annotated, cvt_to_rgb=cvt_to_rgb)
 
 def save_image_detection(default_imgpath: str,
                          boxes: Union[sv.Detections, np.ndarray],
                          save_name: str,
                          save_dir: str,
-                         box_thicknes: int = 1):
+                         box_classes: Optional[List[str]] = None, 
+                         box_thickness: int = 1, 
+                         cvt_to_rgb=True, 
+                         display_size=False):
     if isinstance(boxes, sv.Detections):
         boxes = boxes.xyxy.astype(np.int32)
-    annotated = box_annotated_image(default_imgpath, boxes, box_thicknes)
+    annotated = annotate_image_detection(default_imgpath, boxes, box_classes, box_thickness, cvt_to_rgb, display_size)
+    # annotated = box_annotated_image(default_imgpath, boxes, box_thicknes)
     save_image(annotated, save_name, save_dir)
 
 

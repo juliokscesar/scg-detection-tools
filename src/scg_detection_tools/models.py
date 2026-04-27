@@ -71,9 +71,11 @@ class BaseDetectionModel(ABC):
         img = cv2.imread(img_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+        slice_overlap_wh = (int(slice_wh[0] * slice_overlap_ratio[0]), int(slice_wh[1] * slice_overlap_ratio[1]))
+
         slicer = sv.InferenceSlicer(callback=sv_slice_callback,
-                                    slice_wh=slice_wh,
-                                    overlap_ratio_wh=slice_overlap_ratio,
+                                    slice_wh=tuple(slice_wh),
+                                    overlap_wh=slice_overlap_wh,
                                     iou_threshold=slice_iou_threshold)
         sliced_detections = slicer(image=img)
         return sliced_detections
