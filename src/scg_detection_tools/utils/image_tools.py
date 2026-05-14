@@ -7,6 +7,8 @@ from typing import Union, Tuple, List, Optional
 import os
 from copy import deepcopy
 import hashlib
+import re
+import pillow_heif
 
 from scg_detection_tools.utils.file_handling import get_all_files_from_paths
 import scg_detection_tools.utils.cvt as cvt
@@ -92,7 +94,7 @@ def box_annotated_image(img: Union[str, np.ndarray], boxes: Union[sv.Detections,
             annotated_img, 
             (x1, y1), 
             (x2, y2), 
-            color=box_colors[i] if box_colors else [255,0,255], 
+            color=box_colors[i] if box_colors else [46,214,255], 
             thickness=box_thickness
         )
     return annotated_img
@@ -320,13 +322,28 @@ def save_image(img: np.ndarray, name: str, dir: Union[str, None] = None, cvt_to_
     if notify_save:
         print(f"Saved image {out_file}")
 
+HEIF_REGEX = re.compile(r"\.hei[fc]", re.IGNORECASE)
+def is_heif_image(f: str):
+    return HEIF_REGEX.search(f) is not None
+
+def read_heif_image(f: Union[str, np.ndarray, bytes]) -> np.ndarray:
+    heif_file = pillow_heif.open_heif(f, convert_hdr_to_8bit=False, bgr_mode=True)
+    cv_image = np.asarray(heif_file).astype(np.uint8)
+    return cv_image
+
 def load_images(*args, color_space="RGB"):
     files = get_all_files_from_paths(*args)
     imgs = []
     for file in files:
-        img = cv2.imread(file)
+        if is_heif_image(file):
+            img = read_heif_image(file)
+        else:
+            img = cv2.imread(file)
+            
         if color_space == "RGB":
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        elif color_space == "BGR":
+            pass
         elif color_space == "RGBA":
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
         else:
